@@ -188,6 +188,9 @@ test/agentchat/test_agent_scripts/*
 .db
 local_cache
 
+# Ignore task-centric-memory artifacts
+python/**/memory_bank/**
+python/**/pagelogs/**
 
 notebook/result.png
 samples/apps/autogen-studio/autogenstudio/models/test/

@@ -7,7 +7,7 @@ from autogen_core.models import (
 )
 from autogen_ext.experimental.task_centric_memory.utils import Apprentice, Grader, PageLogger
 
-from utils import create_oai_client, load_yaml_file
+from utils import create_azureai_client, load_yaml_file
 
 
 """
@@ -108,7 +108,7 @@ async def run_example(config_filepath: str) -> None:
 
     # Create the necessary components.
     logger = PageLogger(config["PageLogger"])
-    client = create_oai_client(config["client"])
+    client = create_azureai_client(config["client"])
     apprentice = Apprentice(client, config["Apprentice"], logger)
 
     # Call the example function.
