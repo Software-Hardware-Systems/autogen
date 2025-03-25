@@ -22,9 +22,9 @@ public static class SemanticKernelHostingExtensions
         {
             o.EmbeddingsEndpoint = o.ImageEndpoint = o.ChatEndpoint = builder.Configuration["OpenAI:Endpoint"] ?? throw new InvalidOperationException("Ensure that OpenAI:Endpoint is set in configuration");
             o.EmbeddingsApiKey = o.ImageApiKey = o.ChatApiKey = builder.Configuration["OpenAI:Key"]!;
-            o.EmbeddingsDeploymentOrModelId = "text-embedding-3-large";
-            o.ImageDeploymentOrModelId = "dall-e-3";
-            o.ChatDeploymentOrModelId = "gpt-4o";
+            o.EmbeddingsDeploymentOrModelId = builder.Configuration["OpenAI:EmbeddingsDeploymentOrModelId"]!;
+            o.ImageDeploymentOrModelId = builder.Configuration["OpenAI:ImageDeploymentOrModelId"]!;
+            o.ChatDeploymentOrModelId = builder.Configuration["OpenAI:ChatDeploymentOrModelId"]!;
         });
 
         builder.Services.Configure<AzureOpenAIClientOptions>(o =>
