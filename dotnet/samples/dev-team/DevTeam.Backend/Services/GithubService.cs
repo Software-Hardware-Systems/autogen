@@ -244,12 +244,12 @@ public class FileResponse
 
 public interface IManageGithub
 {
-    Task<int> CreateIssue(string org, string repo, string input, string functionName, long parentNumber);
-    Task CreatePR(string org, string repo, long number, string branch);
-    Task CreateBranch(string org, string repo, string branch);
-    Task CommitToBranch(string org, string repo, long parentNumber, long issueNumber, string rootDir, string branch);
+    public Task<int> CreateIssue(string org, string repo, string input, string functionName, long parentNumber);
+    public Task CreatePR(string org, string repo, long number, string branch);
+    public Task CreateBranch(string org, string repo, string branch);
+    public Task CommitToBranch(string org, string repo, long parentNumber, long issueNumber, string rootDir, string branch);
 
-    Task PostComment(string org, string repo, long issueNumber, string comment);
-    Task<IEnumerable<FileResponse>> GetFiles(string org, string repo, string branch, Func<RepositoryContent, bool> filter);
-    Task<string> GetMainLanguage(string org, string repo);
+    public Task PostComment(string org, string repo, long issueNumber, string comment);
+    public Task<IEnumerable<FileResponse>> GetFiles(string org, string repo, string branch, Func<RepositoryContent, bool> filter);
+    public Task<string> GetMainLanguage(string org, string repo);
 }

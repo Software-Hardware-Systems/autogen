@@ -1,41 +1,69 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Developer.cs
 
+using AutoGen.Core;
 using DevTeam.Agents;
 using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
+using Microsoft.AutoGen.RuntimeGateway.Grpc.Tests;
+using Microsoft.SemanticKernel.Memory;
 
 namespace DevTeam.Backend.Agents.Developer;
 
-[TopicSubscription(Consts.TopicName)]
-public class Dev([FromKeyedServices("AgentsMetadata")] AgentsMetadata typeRegistry, ILogger<Dev> logger)
-    : AiAgent<DeveloperState>(typeRegistry, logger), IDevelopApps,
+[TypeSubscription(Consts.TopicName)]
+public class Dev(
+    [FromKeyedServices("AgentsMetadata")] AgentsMetadata agentsMetadata,
+    IPersistentState<DeveloperMetadata> state,
+
+    ISemanticTextMemory semanticTextMemory,
+    AutoGen.Core.IAgent coreAgent,
+    IHostApplicationLifetime hostApplicationLifetime,
+    AgentId id,
+    IAgentRuntime runtime,
+    Logger<AiAgent<Dev>>? logger = null)
+    :
+    AiAgent<Dev>(semanticTextMemory, coreAgent, hostApplicationLifetime, id, runtime, logger),
+    IDevelopApps,
     IHandle<CodeGenerationRequested>,
     IHandle<CodeChainClosed>
 {
-    public async Task Handle(CodeGenerationRequested item, CancellationToken cancellationToken = default)
+    public async ValueTask HandleAsync(CodeGenerationRequested item, MessageContext messageContext)
     {
         var code = await GenerateCode(item.Ask);
-        var evt = new CodeGenerated
-        {
-            Org = item.Org,
-            Repo = item.Repo,
-            IssueNumber = item.IssueNumber,
-            Code = code
-        };
         // TODO: Read the Topic from the agent metadata
-        await PublishMessageAsync(evt, topic: Consts.TopicName).ConfigureAwait(false);
+        // Get the topic from the agent metadata
+        var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
+        // TODO: How to handle multiple topics?
+        var topic = topics?.FirstOrDefault() ?? Consts.TopicName;
+
+        await PublishMessageAsync(
+            new CodeGenerated
+            {
+                Org = item.Org,
+                Repo = item.Repo,
+                IssueNumber = item.IssueNumber,
+                Code = code
+            },
+            topic: messageContext.Topic ?? new TopicId(topic)
+        ).ConfigureAwait(false);
     }
 
-    public async Task Handle(CodeChainClosed item, CancellationToken cancellationToken = default)
+    public async ValueTask HandleAsync(CodeChainClosed item, MessageContext messageContext)
     {
-        //TODO: Get code from state
-        var lastCode = ""; // _state.State.History.Last().Message
-        var evt = new CodeCreated
-        {
-            Code = lastCode
-        };
-        await PublishMessageAsync(evt, topic: Consts.TopicName).ConfigureAwait(false);
+        var lastCode = state.State.CodeCandidates.Last().GetContent();
+        // TODO: Read the Topic from the agent metadata
+        // Get the topic from the agent metadata
+        var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
+        // TODO: How to handle multiple topics?
+        var topic = topics?.FirstOrDefault() ?? Consts.TopicName;
+
+        await PublishMessageAsync(
+            new CodeCreated
+            {
+                Code = lastCode
+            },
+            topic: messageContext.Topic ?? new TopicId(topic)
+        ).ConfigureAwait(false);
     }
 
     public async Task<string> GenerateCode(string ask)
@@ -49,10 +77,16 @@ public class Dev([FromKeyedServices("AgentsMetadata")] AgentsMetadata typeRegist
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error generating code");
+            logger?.LogError(ex, "Error generating code");
             return "";
         }
     }
+}
+
+public class DeveloperMetadata
+{
+    public List<IMessage> CodeCandidates { get; set; } = new();
+    public List<IMessage> ChatHistory { get; set; } = new();
 }
 
 public interface IDevelopApps

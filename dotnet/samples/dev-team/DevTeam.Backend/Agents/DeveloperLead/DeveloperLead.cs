@@ -1,63 +1,96 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // DeveloperLead.cs
 
+using AutoGen.Core;
 using DevTeam.Agents;
+using DevTeam.Backend.Agents.Developer;
 using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
+using Microsoft.AutoGen.RuntimeGateway.Grpc.Tests;
+using Microsoft.SemanticKernel.Memory;
 
 namespace DevTeam.Backend.Agents.DeveloperLead;
 
-[TopicSubscription(Consts.TopicName)]
-public class DeveloperLead([FromKeyedServices("AgentsMetadata")] AgentsMetadata typeRegistry, ILogger<DeveloperLead> logger)
-    : AiAgent<DeveloperLeadState>(typeRegistry, logger), ILeadDevelopers,
+[TypeSubscription(Consts.TopicName)]
+public class DeveloperLead(
+    [FromKeyedServices("AgentsMetadata")] AgentsMetadata agentsMetadata,
+    IPersistentState<DeveloperLeadMetadata> state,
+    ISemanticTextMemory semanticTextMemory,
+    AutoGen.Core.IAgent coreAgent,
+    IHostApplicationLifetime hostApplicationLifetime,
+    AgentId id,
+    IAgentRuntime runtime,
+    Logger<AiAgent<DeveloperLead>>? logger = null)
+    :
+    AiAgent<DeveloperLead>(semanticTextMemory, coreAgent, hostApplicationLifetime, id, runtime, logger),
+    ILeadDevelopers,
     IHandle<DevPlanRequested>,
     IHandle<DevPlanChainClosed>
 {
-    public async Task Handle(DevPlanRequested item, CancellationToken cancellationToken = default)
+    public async ValueTask HandleAsync(DevPlanRequested item, MessageContext messageContext)
     {
-        var plan = await CreatePlan(item.Ask);
-        var evt = new DevPlanGenerated
-        {
-            Org = item.Org,
-            Repo = item.Repo,
-            IssueNumber = item.IssueNumber,
-            Plan = plan
-        };
-        await PublishMessageAsync(evt, topic: Consts.TopicName).ConfigureAwait(false);
+        var planCandidate = await CreatePlan(item.Ask);
+        state.State.PlanCandidates.Add(planCandidate);
+
+        // TODO: Read the Topic from the agent metadata
+        // TODO: Should we use the topic from the message context?
+        // TODO: How to handle multiple topics?
+        // Get the topic from the agent metadata
+        var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
+        var topic = topics?.FirstOrDefault() ?? Consts.TopicName;
+
+        await PublishMessageAsync(
+            new DevPlanGenerated
+            {
+                Org = item.Org,
+                Repo = item.Repo,
+                IssueNumber = item.IssueNumber,
+                Plan = planCandidate
+            },
+            topic: messageContext.Topic ?? new TopicId(topic)
+        ).ConfigureAwait(false);
     }
 
-    public async Task Handle(DevPlanChainClosed item, CancellationToken cancellationToken = default)
+    public async ValueTask HandleAsync(DevPlanChainClosed item, MessageContext messageContext)
     {
-        // TODO: Get plan from state
-        var lastPlan = ""; // _state.State.History.Last().Message
-        var evt = new DevPlanCreated
-        {
-            Plan = lastPlan
-        };
-        await PublishMessageAsync(evt, topic: Consts.TopicName).ConfigureAwait(false);
+        var lastPlan = state.State.PlanCandidates.Last();
+        // TODO: Read the Topic from the agent metadata
+        // TODO: Should we use the topic from the message context?
+        // TODO: How to handle multiple topics?
+        // Get the topic from the agent metadata
+        var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
+        var topic = topics?.FirstOrDefault() ?? Consts.TopicName;
+
+        await PublishMessageAsync(
+            new DevPlanCreated
+            {
+                Plan = lastPlan
+            },
+            topic: messageContext.Topic ?? new TopicId(topic)
+        ).ConfigureAwait(false);
     }
+
     public async Task<string> CreatePlan(string ask)
     {
         try
         {
-            //var context = new KernelArguments { ["input"] = AppendChatHistory(ask) };
-            //var instruction = "Consider the following architectural guidelines:!waf!";
-            //var enhancedContext = await AddKnowledge(instruction, "waf", context);
-            //var settings = new OpenAIPromptExecutionSettings
-            //{
-            //    ResponseFormat = "json_object",
-            //    MaxTokens = 4096,
-            //    Temperature = 0.8,
-            //    TopP = 1
-            //};
+            var context = state.State.ChatHistory.ToString() ?? "";
+            var instruction = "Consider the following architectural guidelines:!waf!";
+            await AddKnowledge(instruction, context);
             return await CallFunction(DevLeadSkills.Plan);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error creating development plan");
+            logger?.LogError(ex, "Error creating development plan");
             return "";
         }
     }
+}
+
+public class DeveloperLeadMetadata
+{
+    public List<string> PlanCandidates { get; set; } = new();
+    public List<IMessage> ChatHistory { get; set; } = new();
 }
 
 public interface ILeadDevelopers
