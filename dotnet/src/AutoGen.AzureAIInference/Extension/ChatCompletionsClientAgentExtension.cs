@@ -1,11 +1,11 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// ChatComptionClientAgentExtension.cs
+// ChatCompletionsClientAgentExtension.cs
 
 using AutoGen.Core;
 
 namespace AutoGen.AzureAIInference.Extension;
 
-public static class ChatComptionClientAgentExtension
+public static class ChatCompletionsClientAgentExtension
 {
     /// <summary>
     /// Register an <see cref="AzureAIInferenceChatRequestMessageConnector"/> to the <see cref="ChatCompletionsClientAgent"/>
