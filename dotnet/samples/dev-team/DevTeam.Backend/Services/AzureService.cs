@@ -161,8 +161,8 @@ public class AzureService : IManageAzure
 
 public interface IManageAzure
 {
-    Task Store(string org, string repo, long parentIssueNumber, long issueNumber, string filename, string extension, string dir, string output);
-    Task RunInSandbox(string org, string repo, long parentIssueNumber, long issueNumber);
-    Task<bool> IsSandboxCompleted(string sandboxId);
-    Task DeleteSandbox(string sandboxId);
+    public Task Store(string org, string repo, long parentIssueNumber, long issueNumber, string filename, string extension, string dir, string output);
+    public Task RunInSandbox(string org, string repo, long parentIssueNumber, long issueNumber);
+    public Task<bool> IsSandboxCompleted(string sandboxId);
+    public Task DeleteSandbox(string sandboxId);
 }

@@ -1,6 +1,9 @@
-﻿using System.Reflection;
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Program.cs
+
+using System.Reflection;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel.Connectors.OpenAI;
+using Microsoft.SemanticKernel.Connectors.AzureOpenAI;
 using Microsoft.SemanticKernel.Connectors.Qdrant;
 using Microsoft.SemanticKernel.Memory;
 using UglyToad.PdfPig;
@@ -9,7 +12,7 @@ using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 public sealed class Program
 {
     private const string WafFileName = "azure-well-architected.pdf";
-    static async Task Main()
+    public static async Task Main()
     {
         var kernelSettings = KernelSettings.LoadSettings();
 
@@ -24,7 +27,7 @@ public sealed class Program
         var memoryBuilder = new MemoryBuilder();
         var memory = memoryBuilder.WithLoggerFactory(loggerFactory)
                     .WithQdrantMemoryStore(kernelSettings.QdrantEndpoint, 1536)
-                    .WithAzureOpenAITextEmbeddingGeneration(kernelSettings.EmbeddingDeploymentOrModelId, kernelSettings.Endpoint, kernelSettings.ApiKey)
+                    .WithTextEmbeddingGeneration(new AzureOpenAITextEmbeddingGenerationService(kernelSettings.EmbeddingDeploymentOrModelId, kernelSettings.Endpoint, kernelSettings.ApiKey))
                     .Build();
 
         await ImportDocumentAsync(memory, WafFileName).ConfigureAwait(false);
@@ -33,12 +36,7 @@ public sealed class Program
     public static async Task ImportDocumentAsync(ISemanticTextMemory memory, string filename)
     {
         var asm = Assembly.GetExecutingAssembly();
-        var currentDirectory = Path.GetDirectoryName(asm.Location);
-        if (currentDirectory is null)
-        {
-            throw new DirectoryNotFoundException($"Could not find directory for assembly '{asm}'.");
-        }
-
+        var currentDirectory = Path.GetDirectoryName(asm.Location) ?? throw new DirectoryNotFoundException($"Could not find directory for assembly '{asm}'.");
         var filePath = Path.Combine(currentDirectory, filename);
         using var pdfDocument = PdfDocument.Open(File.OpenRead(filePath));
         var pages = pdfDocument.GetPages();

@@ -2,9 +2,10 @@
 // GithubWebHookProcessor.cs
 
 using System.Globalization;
+using DevTeam.Agents;
+using DevTeam.Backend.Agents;
 using Google.Protobuf;
 using Microsoft.AutoGen.Contracts;
-using Microsoft.AutoGen.Core;
 using Octokit.Webhooks;
 using Octokit.Webhooks.Events;
 using Octokit.Webhooks.Events.IssueComment;
@@ -13,10 +14,10 @@ using Octokit.Webhooks.Models;
 
 namespace DevTeam.Backend.Services;
 
-public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logger, Client client) : WebhookEventProcessor
+public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logger, AiAgent<Hubber> client) : WebhookEventProcessor
 {
     private readonly ILogger<GithubWebHookProcessor> _logger = logger;
-    private readonly Client _client = client;
+    private readonly AiAgent<Hubber> _client = client;
 
     protected override async Task ProcessIssuesWebhookAsync(WebhookHeaders headers, IssuesEvent issuesEvent, IssuesAction action)
     {
@@ -122,7 +123,7 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
             _ => new CloudEvent() // TODO: default event
         };
 
-        await _client.PublishMessageAsync(evt, Consts.TopicName, subject);
+        await _client.PublishMessageAsync(evt, new TopicId(Consts.TopicName), subject);
     }
 
     private async Task HandleNewAsk(long issueNumber, string skillName, string functionName, string suffix, string input, string org, string repo)
@@ -140,7 +141,7 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
                 ("Developer", "Implement") => new CodeGenerationRequested { Ask = input, IssueNumber = issueNumber, Org = org, Repo = repo },
                 _ => new CloudEvent()
             };
-            await _client.PublishMessageAsync(evt, Consts.TopicName, subject);
+            await _client.PublishMessageAsync(evt, new TopicId(Consts.TopicName), subject);
         }
         catch (Exception ex)
         {

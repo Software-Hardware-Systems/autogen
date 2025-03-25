@@ -2,15 +2,29 @@
 // Hubber.cs
 
 using System.Text.Json;
+using DevTeam.Agents;
 using DevTeam.Backend.Services;
 using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
+using Microsoft.SemanticKernel.Memory;
+//using Microsoft.AutoGen.RuntimeGateway.Grpc.Tests;
 
 namespace DevTeam.Backend.Agents;
 
-[TopicSubscription(Consts.TopicName)]
-public class Hubber([FromKeyedServices("AgentsMetadata")] AgentsMetadata typeRegistry, IManageGithub ghService)
-    : Agent(typeRegistry),
+[TypeSubscription(Consts.TopicName)]
+public class Hubber(
+    //[FromKeyedServices("AgentsMetadata")] AgentsMetadata agentsMetadata,
+    // GitHub service for creating issues, comments, branches, PRs, and commits
+    IManageGithub ghService,
+    ISemanticTextMemory semanticTextMemory,
+    AutoGen.Core.IAgent coreAgent,
+    IHostApplicationLifetime hostApplicationLifetime,
+    AgentId id,
+    IAgentRuntime runtime,
+    ILogger<AiAgent<Hubber>>? logger = null)
+    :
+    AiAgent<Hubber>(semanticTextMemory, coreAgent, hostApplicationLifetime, id, runtime, logger),
+    // Event handlers for GitHub-related workflow steps
     IHandle<NewAsk>,
     IHandle<ReadmeGenerated>,
     IHandle<DevPlanGenerated>,
@@ -18,7 +32,7 @@ public class Hubber([FromKeyedServices("AgentsMetadata")] AgentsMetadata typeReg
     IHandle<ReadmeStored>,
     IHandle<CodeGenerated>
 {
-    public async Task Handle(NewAsk item, CancellationToken cancellationToken = default)
+    public async ValueTask HandleAsync(NewAsk item, MessageContext messageContext)
     {
         var pmIssue = await CreateIssue(item.Org, item.Repo, item.Ask, "PM.Readme", item.IssueNumber);
         var devLeadIssue = await CreateIssue(item.Org, item.Repo, item.Ask, "DevLead.Plan", item.IssueNumber);
@@ -27,25 +41,25 @@ public class Hubber([FromKeyedServices("AgentsMetadata")] AgentsMetadata typeReg
         await CreateBranch(item.Org, item.Repo, $"sk-{item.IssueNumber}");
     }
 
-    public async Task Handle(ReadmeGenerated item, CancellationToken cancellationToken = default)
+    public async ValueTask HandleAsync(ReadmeGenerated item, MessageContext messageContext)
     {
         var contents = string.IsNullOrEmpty(item.Readme) ? "Sorry, I got tired, can you try again please? " : item.Readme;
         await PostComment(item.Org, item.Repo, item.IssueNumber, contents);
     }
 
-    public async Task Handle(DevPlanGenerated item, CancellationToken cancellationToken = default)
+    public async ValueTask HandleAsync(DevPlanGenerated item, MessageContext messageContext)
     {
         var contents = string.IsNullOrEmpty(item.Plan) ? "Sorry, I got tired, can you try again please? " : item.Plan;
         await PostComment(item.Org, item.Repo, item.IssueNumber, contents);
     }
 
-    public async Task Handle(CodeGenerated item, CancellationToken cancellationToken = default)
+    public async ValueTask HandleAsync(CodeGenerated item, MessageContext messageContext)
     {
         var contents = string.IsNullOrEmpty(item.Code) ? "Sorry, I got tired, can you try again please? " : item.Code;
         await PostComment(item.Org, item.Repo, item.IssueNumber, contents);
     }
 
-    public async Task Handle(DevPlanCreated item, CancellationToken cancellationToken = default)
+    public async ValueTask HandleAsync(DevPlanCreated item, MessageContext messageContext)
     {
         var plan = JsonSerializer.Deserialize<DevLeadPlan>(item.Plan);
         var prompts = plan!.Steps.SelectMany(s => s.Subtasks!.Select(st => st.Prompt));
@@ -59,7 +73,7 @@ public class Hubber([FromKeyedServices("AgentsMetadata")] AgentsMetadata typeReg
         }
     }
 
-    public async Task Handle(ReadmeStored item, CancellationToken cancellationToken = default)
+    public async ValueTask HandleAsync(ReadmeStored item, MessageContext messageContext)
     {
         var branch = $"sk-{item.ParentNumber}";
         await CommitToBranch(item.Org, item.Repo, item.ParentNumber, item.IssueNumber, "output", branch);

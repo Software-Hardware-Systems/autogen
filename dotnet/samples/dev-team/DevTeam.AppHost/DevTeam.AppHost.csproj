@@ -16,10 +16,12 @@
     <PackageReference Include="Aspire.Hosting.Azure.ApplicationInsights" />
     <PackageReference Include="Aspire.Hosting.Azure.CognitiveServices" />
     <PackageReference Include="Aspire.Hosting.Orleans" />
+    <PackageReference Include="Aspire.Hosting.Python" />
     <PackageReference Include="Aspire.Hosting.Qdrant" />
   </ItemGroup>
 
    <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Microsoft.AutoGen\AgentHost\Microsoft.AutoGen.AgentHost.csproj" />
     <ProjectReference Include="..\DevTeam.Backend\DevTeam.Backend.csproj" />
   </ItemGroup>
 

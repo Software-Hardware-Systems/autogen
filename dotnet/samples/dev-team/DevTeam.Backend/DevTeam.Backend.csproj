@@ -4,11 +4,16 @@
         <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>5e864974-5f4f-44bf-8842-119de167285e</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Azure.AI.OpenAI" />
     <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" />
+    <PackageReference Include="Microsoft.SemanticKernel" />
+    <PackageReference Include="Microsoft.SemanticKernel.Connectors.Qdrant" />
+    <PackageReference Include="Microsoft.SemanticKernel.Plugins.Memory" />
     <PackageReference Include="Octokit.Webhooks.AspNetCore" />
     <PackageReference Include="Octokit" />
     <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" />
@@ -25,8 +30,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\src\AutoGen.AzureAIInference\AutoGen.AzureAIInference.csproj" />
+    <ProjectReference Include="..\..\..\src\AutoGen.SemanticKernel\AutoGen.SemanticKernel.csproj" />
+    <ProjectReference Include="..\..\..\src\Microsoft.AutoGen\Agents\Microsoft.AutoGen.Agents.csproj" />
+    <ProjectReference Include="..\..\..\src\Microsoft.AutoGen\Contracts\Microsoft.AutoGen.Contracts.csproj" />
     <ProjectReference Include="..\..\..\src\Microsoft.AutoGen\Core.Grpc\Microsoft.AutoGen.Core.Grpc.csproj" />
     <ProjectReference Include="..\..\..\src\Microsoft.AutoGen\Core\Microsoft.AutoGen.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Microsoft.AutoGen\Extensions\MEAI\Microsoft.AutoGen.Extensions.MEAI.csproj" />
+    <ProjectReference Include="..\..\..\src\Microsoft.AutoGen\Extensions\SemanticKernel\Microsoft.AutoGen.Extensions.SemanticKernel.csproj" />
+    <ProjectReference Include="..\..\..\test\Microsoft.AutoGen.RuntimeGateway.Grpc.Tests\Microsoft.AutoGen.RuntimeGateway.Grpc.Tests.csproj" />
     <ProjectReference Include="..\DevTeam.ServiceDefaults\DevTeam.ServiceDefaults.csproj" />
   </ItemGroup>
 
