@@ -112,9 +112,10 @@ public static class ServiceCollectionChatClientExtensions
         return hostBuilder.Services.AddChatClient(pipeline =>
         {
             builder?.Invoke(pipeline);
-            var token = Environment.GetEnvironmentVariable("GH_TOKEN") ?? throw new InvalidOperationException("No model access token was found in the environment variable GH_TOKEN");
+            var apikeyOrToken = $"{serviceName}:ApiKey" ?? Environment.GetEnvironmentVariable("GH_TOKEN")
+            ?? throw new InvalidOperationException("Neither an Azure Inference api key was specified nor was a GitHub model access token was found in the environment variable GH_TOKEN");
             return pipeline.Use(new ChatCompletionsClient(
-            endpointUri, new AzureKeyCredential(token)).AsChatClient(modelOrDeploymentName));
+            endpointUri, new AzureKeyCredential(apikeyOrToken)).AsChatClient(modelOrDeploymentName));
         });
     }
 }
