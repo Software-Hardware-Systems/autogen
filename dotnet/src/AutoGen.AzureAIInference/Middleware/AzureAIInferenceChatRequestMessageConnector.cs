@@ -39,7 +39,10 @@ public class AzureAIInferenceChatRequestMessageConnector : IStreamingMiddleware
 
     public string? Name => nameof(AzureAIInferenceChatRequestMessageConnector);
 
-    public async Task<IMessage> InvokeAsync(MiddlewareContext context, IAgent agent, CancellationToken cancellationToken = default)
+    public async Task<IMessage> InvokeAsync(
+        MiddlewareContext context,
+        IAgent agent,
+        CancellationToken cancellationToken = default)
     {
         var chatMessages = ProcessIncomingMessages(agent, context.Messages);
 
@@ -126,13 +129,16 @@ public class AzureAIInferenceChatRequestMessageConnector : IStreamingMiddleware
 
     private IMessage PostProcessChatCompletions(IMessage<ChatCompletions> message)
     {
-        // throw exception if prompt filter results is not null
-        if (message.Content.Choices[0].FinishReason == CompletionsFinishReason.ContentFiltered)
+        foreach (var choice in message.Content.Choices)
         {
-            throw new InvalidOperationException("The content is filtered because its potential risk. Please try another input.");
+            if (choice.FinishReason != CompletionsFinishReason.ContentFiltered)
+            {
+                return PostProcessChatResponseMessage(choice.Message, message.From);
+            }
         }
 
-        return PostProcessChatResponseMessage(message.Content.Choices[0].Message, message.From);
+        // If all choices are filtered, throw an exception
+        throw new InvalidOperationException("All content is filtered because of its potential risk. Please try another input.");
     }
 
     private IMessage PostProcessChatResponseMessage(ChatResponseMessage chatResponseMessage, string? from)
