@@ -207,3 +207,4 @@ registry.json
 .gitty/
 python/uv.lock
 /dotnet/samples/dev-team/DevTeam.Backend/appsettings.json
+/dotnet/samples/dev-team/DevTeam.AppHost/appsettings.json
