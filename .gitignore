@@ -206,3 +206,4 @@ registry.json
 # files created by the gitty agent in python/samples/gitty
 .gitty/
 python/uv.lock
+/dotnet/samples/dev-team/DevTeam.Backend/appsettings.json
