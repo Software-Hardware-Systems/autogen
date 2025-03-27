@@ -7,36 +7,43 @@ const string pythonHelloAgentPy = "hello_python_agent.py";
 const string pythonVEnv = "../../../../python/.venv";
 //Environment.SetEnvironmentVariable("XLANG_TEST_NO_DOTNET", "true");
 //Environment.SetEnvironmentVariable("XLANG_TEST_NO_PYTHON", "true");
-var builder = DistributedApplication.CreateBuilder(args);
-var backend = builder.AddProject<Projects.Microsoft_AutoGen_AgentHost>("AgentHost").WithExternalHttpEndpoints();
-IResourceBuilder<ProjectResource>? dotnet = null;
-#pragma warning disable ASPIREHOSTINGPYTHON001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-IResourceBuilder<PythonAppResource>? python = null;
+
+var distributedApplicationBuilder = DistributedApplication.CreateBuilder(args);
+var autoGenAgentHost = distributedApplicationBuilder.AddProject<Projects.Microsoft_AutoGen_AgentHost>("AgentHost").WithExternalHttpEndpoints();
+
+IResourceBuilder<ProjectResource>? dotnetAgent = null;
 if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("XLANG_TEST_NO_DOTNET")))
 {
-    dotnet = builder.AddProject<Projects.HelloAgentTests>("HelloAgentTestsDotNET")
-        .WithReference(backend)
-        .WithEnvironment("AGENT_HOST", backend.GetEndpoint("https"))
+    dotnetAgent = distributedApplicationBuilder.AddProject<Projects.HelloAgentTests>("HelloAgentTestsDotNET")
+        .WithReference(autoGenAgentHost)
+        .WithEnvironment("AGENT_HOST", autoGenAgentHost.GetEndpoint("https"))
         .WithEnvironment("STAY_ALIVE_ON_GOODBYE", "true")
-        .WaitFor(backend);
+        .WaitFor(autoGenAgentHost);
 }
+
+#pragma warning disable ASPIREHOSTINGPYTHON001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+IResourceBuilder<PythonAppResource>? pythonAgent = null;
 if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("XLANG_TEST_NO_PYTHON")))
 {
     // xlang is over http for now - in prod use TLS between containers
-    python = builder.AddPythonApp("HelloAgentTestsPython", pythonHelloAgentPath, pythonHelloAgentPy, pythonVEnv)
-        .WithReference(backend)
-        .WithEnvironment("AGENT_HOST", backend.GetEndpoint("http"))
+    pythonAgent = distributedApplicationBuilder.AddPythonApp("HelloAgentTestsPython", pythonHelloAgentPath, pythonHelloAgentPy, pythonVEnv)
+        .WithReference(autoGenAgentHost)
+        .WithEnvironment("AGENT_HOST", autoGenAgentHost.GetEndpoint("http"))
         .WithEnvironment("STAY_ALIVE_ON_GOODBYE", "true")
         .WithEnvironment("GRPC_DNS_RESOLVER", "native")
         .WithOtlpExporter()
-        .WaitFor(backend);
-    if (dotnet != null) { python.WaitFor(dotnet); }
-}
+        .WaitFor(autoGenAgentHost);
 #pragma warning restore ASPIREHOSTINGPYTHON001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-using var app = builder.Build();
-await app.StartAsync();
-var url = backend.GetEndpoint("http").Url;
+    if (dotnetAgent != null) { pythonAgent.WaitFor(dotnetAgent); }
+}
+
+using var distributedApp = distributedApplicationBuilder.Build();
+await distributedApp.StartAsync();
+
+var url = autoGenAgentHost.GetEndpoint("http").Url;
 Console.WriteLine("Backend URL: " + url);
-if (dotnet != null) { Console.WriteLine("Dotnet Resource Projects.HelloAgentTests invoked as HelloAgentTestsDotNET"); }
-if (python != null) { Console.WriteLine("Python Resource hello_python_agent.py invoked as HelloAgentTestsPython"); }
-await app.WaitForShutdownAsync();
+
+if (dotnetAgent != null) { Console.WriteLine("Dotnet Resource Projects.HelloAgentTests invoked as HelloAgentTestsDotNET"); }
+if (pythonAgent != null) { Console.WriteLine("Python Resource hello_python_agent.py invoked as HelloAgentTestsPython"); }
+
+await distributedApp.WaitForShutdownAsync();
