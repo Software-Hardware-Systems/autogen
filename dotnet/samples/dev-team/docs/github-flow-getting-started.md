@@ -1,12 +1,39 @@
 ## Prerequisites
 
-- Access to gpt3.5-turbo or preferably gpt4 - [Get access here](https://learn.microsoft.com/en-us/azure/ai-services/openai/overview#how-do-i-get-access-to-azure-openai)
-- [Setup a Github app](#how-do-i-setup-the-github-app)
-- [Install the Github app](https://docs.github.com/en/apps/using-github-apps/installing-your-own-github-app)
-- [Provision the azure resources](#how-do-I-deploy-the-azure-bits)
-- [Create labels for the dev team skills](#which-labels-should-i-create)
+Forward leaning preview infrastructure is used in this sample.
+
+- [Chat Completion/Inference/Encoding](#Chat-Completion/Inference-Endpoint-and-API-keys)
+- [Github App and Repositories](#how-do-i-setup-the-github-app)
+- [Azure Resources](#how-do-I-deploy-the-azure-bits)
+
+### What is this sample about?
+
+This sample demonstrates a proof of concept for integrating AI Agents into a software development team, showcasing how AI can assist in various development tasks. The solution leverages Microsoft Aspire for building distributed applications, Microsoft AutoGen as the AI Agent framework, and Chat Completion/Inference Endpoints for providing intelligence and decision-making capabilities.
+
+The AI Agents in this sample are designed to perform specific roles within a development team, such as project management, development planning, and code implementation. Each agent is responsible for a distinct aspect of the development process, working collaboratively to achieve the team's goals. The GitHub App facilitates seamless integration with GitHub repositories, enabling agents to interact with issues, pull requests, and other repository activities. Azure resources provide the necessary infrastructure for hosting and running the AI Agents, ensuring scalability and reliability.
+
+The intent of this sample is to showcase how AI Agents can be incorporated into a development team to enhance productivity, streamline workflows, and improve overall efficiency. The existing agent population can be expanded or modified to include capabilities tailored to specific needs, making this sample a flexible starting point for various use cases.
+
+By following the provided instructions, users can set up and run the sample locally or within Azure, gaining insights into the potential of AI-driven development teams. This proof of concept serves as a foundation for exploring how AI can be leveraged to support and augment human developers, ultimately leading to more efficient and effective software development processes.
+
+### Chat Completion/Inference Endpoint and API keys
+
+We use [Azure AI Services](https://learn.microsoft.com/en-us/azure/ai-services/) and specifically [Azure AI Foundry](https://learn.microsoft.com/en-us/azure/ai-services/) to provide the intelligence, decision making, and analysis capabilities of the dev-team members. It provides access to a wide range of Chat Completion, Inference, and Encoding models ranging from small, fast, and inexpensive to large, slow, and expensive. You can pick and choose and experiment to find what is right for you.
+
+- First we need to [create a project in the Azure AI Foundry portal](https://learn.microsoft.com/en-us/azure/ai-foundry/how-to/create-projects?tabs=ai-studio)
+
+
+
+
+- - The Chat Completion/Inference endpoint and API keys are used to provide the intelligence, decision making, and analysis capabilities of the dev-team members. Almost any provider will work.
+    - [Sign up for an Azure account](https://azure.microsoft.com/en-us/free/)
+    - [Create an OpenAI resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAi)
+    - Once the resource is created, go to the resource and copy the API key and endpoint. You'll need these values to fill in the `appsettings.json` file.
 
 ### How do I setup the Github app?
+
+- [Install the Github app](https://docs.github.com/en/apps/using-github-apps/installing-your-own-github-app)
+- [Create labels for the dev team skills](#which-labels-should-i-create)
 
 - [Register a Github app](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app), with the options listed below:
     - Give your App a name and add a description
