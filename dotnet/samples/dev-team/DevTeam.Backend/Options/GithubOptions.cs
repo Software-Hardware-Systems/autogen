@@ -11,6 +11,8 @@ public class GithubOptions
     [Required]
     public int AppId { get; set; }
     [Required]
+    public string ClientId { get; set; } = string.Empty;
+    [Required]
     public long InstallationId { get; set; }
     [Required]
     public required string WebhookSecret { get; set; }

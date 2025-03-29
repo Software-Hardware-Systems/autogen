@@ -39,7 +39,7 @@ else
                            .WithEnvironment("ASPNETCORE_Kestrel__Certificates__Default__Password", distributedAppBuilder.Configuration["DevCert:Password"])
                            .WithEnvironment("ASPNETCORE_Kestrel__Certificates__Default__Path", "/https/devcert.pfx")
                            .WithEnvironment("ASPNETCORE_ENVIRONMENT", environment)
-                           .WithBindMount(distributedAppBuilder.Configuration["DevCert:Path"] ?? "./certs", "/https/", true)
+                           .WithBindMount(distributedAppBuilder.Configuration["DevCert:Path"] ?? "./certs", "/https", true)
                            .WithHttpsEndpoint(targetPort: 5001) ?? throw new Exception("Failed to create autoGenAgentHost");
     agentHostHttps = autoGenAgentHost.GetEndpoint("https");
 }
