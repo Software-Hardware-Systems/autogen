@@ -153,6 +153,10 @@ The loader is a project in the `samples` folder, called `seed-memory`. We need t
 ### WIP Local setup
 
 ```
+dotnet user-secrets set "DevCert:Password" "your_devcert_password"
+
+
+
 dotnet user-secrets set "OpenAI:Key" "your_key"
 
 dotnet user-secrets set "OpenAI:Endpoint" "https://your_endpoint.openai.azure.com/"

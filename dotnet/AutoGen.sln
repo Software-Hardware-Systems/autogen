@@ -149,16 +149,20 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XlangTests.AppHost", "test\Microsoft.AutoGen.Integration.Tests.AppHosts\XLangTests.AppHost\XlangTests.AppHost.csproj", "{62CDFB27-3B02-4D4B-B789-8AAD5E20688A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dev-team", "dev-team", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+	ProjectSection(SolutionItems) = preProject
+		samples\dev-team\azure.yaml = samples\dev-team\azure.yaml
+		samples\dev-team\README.md = samples\dev-team\README.md
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DevTeam.AppHost", "samples\dev-team\DevTeam.AppHost\DevTeam.AppHost.csproj", "{3572DC4E-31B1-848B-6891-44B6882CFB69}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DevTeam", "DevTeam", "{11BFF1FA-DE0A-48C3-975E-1C4111134B65}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DevTeam.AppHost", "DevTeam.AppHost", "{11BFF1FA-DE0A-48C3-975E-1C4111134B65}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DevTeam", "DevTeam", "{5EAFBA9F-D168-4CBD-BF9B-D577BA850A91}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DevTeam.Backend", "DevTeam.Backend", "{5EAFBA9F-D168-4CBD-BF9B-D577BA850A91}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DevTeam.Backend", "samples\dev-team\DevTeam.Backend\DevTeam.Backend.csproj", "{80AA62D8-EBDF-8F0F-DA7C-7796A5C6216C}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DevTeam", "DevTeam", "{8463218E-32B9-4A24-9D0B-98B1E2CD5944}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DevTeam.ServiceDefaults", "DevTeam.ServiceDefaults", "{8463218E-32B9-4A24-9D0B-98B1E2CD5944}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DevTeam.ServiceDefaults", "samples\dev-team\DevTeam.ServiceDefaults\DevTeam.ServiceDefaults.csproj", "{E55D9022-21A9-DE0A-A739-A0D02D46BA69}"
 EndProject
@@ -168,6 +172,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{231339B1-2
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "images", "images", "{39F3BE2A-79CB-4F70-9F15-588AD5FC6F0C}"
+	ProjectSection(SolutionItems) = preProject
+		samples\dev-team\docs\images\github-sk-dev-team.png = samples\dev-team\docs\images\github-sk-dev-team.png
+		samples\dev-team\docs\images\new-codespace.png = samples\dev-team\docs\images\new-codespace.png
+		samples\dev-team\docs\images\overview.png = samples\dev-team\docs\images\overview.png
+		samples\dev-team\docs\images\solution-explorer.png = samples\dev-team\docs\images\solution-explorer.png
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Protos", "Protos", "{0422AC67-9885-44C9-A9B8-BA81F47E7ABB}"
 	ProjectSection(SolutionItems) = preProject
