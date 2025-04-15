@@ -4,6 +4,7 @@
 
 using System.Diagnostics;
 using System.Reflection;
+using System.Text.Json;
 using Microsoft.AutoGen.Contracts;
 using Microsoft.Extensions.Logging;
 
@@ -103,15 +104,15 @@ public abstract class BaseAgent : IHostableAgent, ISaveState
         return this.Runtime.PublishMessageAsync(message, topic, sender: this.Id, messageId: messageId, cancellationToken: cancellationToken);
     }
 
-    //public virtual ValueTask<JsonElement> SaveStateAsync()
-    //{
-    //    return new ValueTask<JsonElement>(JsonDocument.Parse("{}").RootElement);
-    //}
+    public virtual ValueTask<JsonElement> SaveStateAsync()
+    {
+        return SaveStateAsync();
+    }
 
-    //public virtual ValueTask LoadStateAsync(JsonElement _)
-    //{
-    //    return ValueTask.CompletedTask;
-    //}
+    public virtual ValueTask LoadStateAsync(JsonElement state)
+    {
+        return LoadStateAsync(state);
+    }
 
     public virtual ValueTask CloseAsync()
     {
