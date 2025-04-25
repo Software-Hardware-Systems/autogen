@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.PowerShell.SDK" />
+    <PackageReference Include="System.Management.Automation" />
   </ItemGroup>
 
 

@@ -1,79 +1,63 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // AzureGenie.cs
 
-//using ApprovalUtilities.Utilities;
-using DevTeam.Agents;
 using DevTeam.Backend.Agents.Developer;
 using DevTeam.Backend.Services;
 using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
 using Microsoft.AutoGen.RuntimeGateway.Grpc.Tests;
-using Microsoft.SemanticKernel.Memory;
 
 namespace DevTeam.Backend.Agents;
 
-[TypeSubscription(Consts.TopicName)]
+[TypeSubscription(SkillType.AzureGenie)]
 public class AzureGenie(
     [FromKeyedServices("AgentsMetadata")] AgentsMetadata agentsMetadata,
-    IPersistentState<SandboxMetadata> state,
     IManageAzure azureService,
-
-    ISemanticTextMemory semanticTextMemory,
-    AutoGen.Core.IAgent coreAgent,
-    IHostApplicationLifetime hostApplicationLifetime,
     AgentId id,
     IAgentRuntime runtime,
-    Logger<AiAgent<AzureGenie>>? logger = null)
+    Logger<AzureGenie>? logger = null)
     :
-    AiAgent<AzureGenie>(semanticTextMemory, coreAgent, hostApplicationLifetime, id, runtime, logger),
+    BaseAgent(id, runtime, nameof(AzureGenie), logger),
     IHandle<ReadmeCreated>,
     IHandle<CodeCreated>
 {
-    public async ValueTask HandleAsync(ReadmeCreated item, MessageContext messageContext)
+    public async ValueTask HandleAsync(ReadmeCreated readmeCreated, MessageContext messageContext)
     {
-        // TODO: Not sure we need to store the files if we use ACA Sessions
-        await state.ReadStateAsync();
-        await StoreAsync(state.State.Org, state.State.Repo, TryParseLong(state.State.ParentIssueNumber), TryParseLong(state.State.IssueNumber), "readme", "md", "output", item.Readme);
+        var (org, repo, issueNumber, parentIssueNumber) = ExtractDetailsFromTopicSource(messageContext.Topic);
 
-        // TODO: Read the Topic from the agent metadata
-        // TODO: Should we use the topic from the message context?
-        // TODO: How to handle multiple topics?
+        // TODO: Not sure we need to store the files if we use ACA Sessions
+        await StoreAsync(org, repo, parentIssueNumber, issueNumber, "readme", "md", "output", readmeCreated.Readme);
+
         // Get the topic from the agent metadata
         var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
-        var topic = topics?.FirstOrDefault() ?? Consts.TopicName;
+        // TODO: How to handle multiple topics?
+        var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
 
         await PublishMessageAsync(
-            new ReadmeStored
-            {
-                Org = state.State.Org,
-                Repo = state.State.Repo,
-                IssueNumber = state.State.IssueNumber,
-                ParentNumber = state.State.ParentIssueNumber,
-            },
+            new ReadmeStored { },
             topic: messageContext.Topic ?? new TopicId(topic)
         ).ConfigureAwait(false);
     }
 
-    public async ValueTask HandleAsync(CodeCreated item, MessageContext messageContext)
+    public async ValueTask HandleAsync(CodeCreated codeCreated, MessageContext messageContext)
     {
+        var (org, repo, issueNumber, parentIssueNumber) = ExtractDetailsFromTopicSource(messageContext.Topic);
+
         // TODO: Not sure we need to store the files if we use ACA Sessions
-        await state.ReadStateAsync();
-        await StoreAsync(state.State.Org, state.State.Repo, TryParseLong(state.State.ParentIssueNumber), TryParseLong(state.State.IssueNumber), "run", "sh", "output", item.Code);
+        await StoreAsync(org, repo, parentIssueNumber, issueNumber, "run", "sh", "output", codeCreated.Code);
 
-        await RunInSandbox(state.State.Org, state.State.Repo, TryParseLong(state.State.ParentIssueNumber), TryParseLong(state.State.IssueNumber));
+        await RunInSandbox(org, repo, parentIssueNumber, issueNumber);
 
-        // TODO: Read the Topic from the agent metadata
-        // TODO: Should we use the topic from the message context?
-        // TODO: How to handle multiple topics?
-        // Get the topic from the agent metadata
+        // Read the Topic from the agent metadata
         var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
-        var topic = topics?.FirstOrDefault() ?? Consts.TopicName;
+        // TODO: How to handle multiple topics?
+        var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
 
         await PublishMessageAsync(
             new SandboxRunCreated
             {
-                UserId = state.State.UserId,
-                UserMessage = state.State.UserMessage,
+                UserName = codeCreated.UserName,
+                UserMessage = codeCreated.UserMessage,
             },
             topic: messageContext.Topic ?? new TopicId(topic)
         ).ConfigureAwait(false);
@@ -89,7 +73,32 @@ public class AzureGenie(
         await azureService.RunInSandbox(org, repo, parentIssueNumber, issueNumber);
     }
 
-    private long TryParseLong(object value)
+    private (string Org, string Repo, long IssueNumber, long ParentIssueNumber) ExtractDetailsFromTopicSource(TopicId? topicId)
+    {
+        if (string.IsNullOrEmpty(topicId?.Source))
+        {
+            throw new ArgumentNullException(nameof(topicId), "TopicId cannot be null");
+        }
+
+        var parts = topicId.Value.Source.Split('-');
+        if (parts.Length >= 4)
+        {
+            return (
+                Org: parts[0],
+                Repo: parts[1],
+                IssueNumber: TryParseLong(parts[2]),
+                ParentIssueNumber: TryParseLong(parts[3])
+            );
+        }
+        return (
+            Org: parts[0],
+            Repo: parts[1],
+            IssueNumber: TryParseLong(parts[2]),
+            ParentIssueNumber: 0
+        );
+    }
+
+    private long TryParseLong(object? value)
     {
         return long.TryParse(value?.ToString(), out var result) ? result : 0;
     }

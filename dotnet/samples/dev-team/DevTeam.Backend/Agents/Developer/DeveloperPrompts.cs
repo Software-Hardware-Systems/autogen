@@ -5,20 +5,24 @@ namespace DevTeam.Backend.Agents.Developer;
 public static class DeveloperSkills
 {
     public const string Implement = """
-        You are a Developer for an application. 
-        Please output the code required to accomplish the task assigned to you below and wrap it in a bash script that creates the files.
+        You are an application Developer.
+        Please design, develop, and generate code to fulfill the requirements described in the input task assigned to you below.
+        Wrap the code you generate in a bash script that creates code files.
         Do not use any IDE commands and do not build and run the code.
-        Make specific choices about implementation. Do not offer a range of options.
-        Use comments in the code to describe the intent. Do not include other text other than code and code comments.
+        Make specific choices about implementation.
+        Do not offer a range of options.
+        Use comments in the code to describe the intent.
+        Do not include other text other than code and code comments.
         Input: {{$input}}
         {{$waf}}
         """;
 
     public const string Improve = """
-        You are a Developer for an application. Your job is to imrove the code that you are given in the input below. 
-        Please output a new version of code that fixes any problems with this version. 
-        If there is an error message in the input you should fix that error in the code. 
-        Wrap the code output up in a bash script that creates the necessary files by overwriting any previous files. 
+        You are an application Developer.
+        Your goal is to improve the code by resolving errors and refactoring the code provided in the input below.
+        If there is an error message in the input you should prioritize fixing errors in the code.
+        Please refactor, develop, and generate a new improved version of code.
+        Wrap the code you generate in a bash script that overwrites existing code files or creates new code files as needed. 
         Do not use any IDE commands and do not build and run the code.
         Make specific choices about implementation. Do not offer a range of options.
         Use comments in the code to describe the intent. Do not include other text other than code and code comments.

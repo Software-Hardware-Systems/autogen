@@ -1,23 +1,22 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>5e864974-5f4f-44bf-8842-119de167285e</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.AI.OpenAI" />
-    <PackageReference Include="Microsoft.Extensions.AI" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" />
+    <!-- Dependencies for Semantic Kernel and GitHub integration. -->
     <PackageReference Include="Microsoft.SemanticKernel" />
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.Qdrant" />
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.Memory" />
     <PackageReference Include="Octokit.Webhooks.AspNetCore" />
     <PackageReference Include="Octokit" />
-    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
+
+    <!-- Dependencies for Azure resource management and gRPC. -->
     <PackageReference Include="Microsoft.Extensions.Azure" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
     <PackageReference Include="Azure.ResourceManager.ContainerInstance" />
@@ -30,12 +29,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\AutoGen.AzureAIInference\AutoGen.AzureAIInference.csproj" />
-    <ProjectReference Include="..\..\..\src\AutoGen.SemanticKernel\AutoGen.SemanticKernel.csproj" />
+    <!-- Project references for AutoGen and Aspire extensions. -->
+    <ProjectReference Include="..\..\..\src\Microsoft.AutoGen\AgentChat\Microsoft.AutoGen.AgentChat.csproj" />
     <ProjectReference Include="..\..\..\src\Microsoft.AutoGen\Agents\Microsoft.AutoGen.Agents.csproj" />
     <ProjectReference Include="..\..\..\src\Microsoft.AutoGen\Contracts\Microsoft.AutoGen.Contracts.csproj" />
     <ProjectReference Include="..\..\..\src\Microsoft.AutoGen\Core.Grpc\Microsoft.AutoGen.Core.Grpc.csproj" />
     <ProjectReference Include="..\..\..\src\Microsoft.AutoGen\Core\Microsoft.AutoGen.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Microsoft.AutoGen\Extensions\Aspire\Microsoft.AutoGen.Extensions.Aspire.csproj" />
     <ProjectReference Include="..\..\..\src\Microsoft.AutoGen\Extensions\MEAI\Microsoft.AutoGen.Extensions.MEAI.csproj" />
     <ProjectReference Include="..\..\..\src\Microsoft.AutoGen\Extensions\SemanticKernel\Microsoft.AutoGen.Extensions.SemanticKernel.csproj" />
     <ProjectReference Include="..\..\..\test\Microsoft.AutoGen.RuntimeGateway.Grpc.Tests\Microsoft.AutoGen.RuntimeGateway.Grpc.Tests.csproj" />
@@ -43,6 +43,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Protobuf files for gRPC communication. -->
     <Protobuf Include="..\Protos\messages.proto" Link="Protos\messages.proto" />
     <Protobuf Include="..\Protos\states.proto" Link="Protos\states.proto" />
   </ItemGroup>

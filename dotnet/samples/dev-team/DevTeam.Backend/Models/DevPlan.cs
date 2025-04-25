@@ -2,7 +2,7 @@
 // DevPlan.cs
 
 namespace DevTeam;
-public class DevLeadPlan
+public class DevPlan
 {
     public required List<StepDescription> Steps { get; set; }
 }

@@ -4,96 +4,209 @@ package devteam;
 
 option csharp_namespace = "DevTeam";
 
+// NewAsk Message: Published when the user/client creates a new GitHub issue assigned to the DevTeam
+//  - Initiates the DevTeam workflow for processing the user's ask.
+// Message Publisher: GitHubWebHookProcessor
+//  - In response to the GitHub application webhook for new issue created and assigned to the DevTeam
+// Message Handler: Hubber:
+//  - Creates a new branch for the DevTeam to work on the issue.
+//  - Creates a new Program Manager readme issue, incorporating the original ask.
+//      - Posts a comment on the readme issue to initiate the Product Manager workflow.
+//  - Creates a new Developer Lead code issue, incorporating the original ask.
+//      - Posts a comment on the code issue to initiate the Developer Lead workflow.
 message NewAsk {
-  string org = 1;
-  string repo = 2;
-  string ask = 3;
-  int64 issue_number = 4;
+  // The user's name
+  string user_name = 1;
+  // The user's natural language request or description of the task.
+  string user_message = 2;
 }
 
+// ReadmeRequested Message: Published whenever a GitHub issue, assigned to the Program Manager, is created or commentted on.
+//  -Indicates new information is available for the README generation process.
+// Message Publisher: GithubWebHookProcessor
+//  - In response to the GitHub application webhook for new issue or issue comment
+// Message Handler: ProductManager
+//  - Uses AI chat completion to generate a README based on the request.
 message ReadmeRequested {
-   string org = 1;
-   string repo = 2;
-   int64 issue_number = 3;
-   string ask = 4;
-}
-message ReadmeChainClosed {
-      string ask = 1;
+  // The user's name
+  string user_name = 1;
+  // The user's natural language request or description of the task.
+  string user_message = 2;
 }
 
-message ReadmeCreated {
+// ReadmeGenerated Message:
+// This message is published when the Product Manager agent generates a README.
+// It is used to provide the generated README to the Hubber agent for further processing.
+// Message Publisher: ProductManager
+// Message Handler: Hubber
+//  - Posts the README as a comment on the GitHub readme issue.
+message ReadmeGenerated {
+  // The generated README content.
   string readme = 1;
 }
 
-message ReadmeGenerated {
-  string org = 1;
-  string repo = 2;
-  int64 issue_number = 3;
-  string readme = 4;
-}
-
-message CodeChainClosed {
-  string user_id = 1;
+// ReadmeIssueClosed Message:
+// This message is published when the user approves the generated README and closes the readme issue.
+// It signals the end of the README generation workflow.
+// Message Publisher: GitHubWebHookProcessor
+// Message Handler: ProductManager
+//  - Saves the README to azure storage.
+message ReadmeIssueClosed {
+  // The user's name
+  string user_name = 1;
+  // The user's natural language request or description of the task.
   string user_message = 2;
+  // The generated README content.
+  string readme = 3;
 }
 
-message CodeGenerationRequested {
-  string org = 1;
-  string repo = 2;
-  int64 issue_number = 3;
-  string ask = 4;
+// ReadmeCreated Message:
+// This message is published when the README is finalized and ready for storage.
+// It is used to trigger the storage of the README in blob storage.
+// Message Publisher: ProductManager
+// Message Handler: AzureGenie
+//  - Stores the README in blob storage.
+message ReadmeCreated {
+  // The finalized README content.
+  string readme = 1;
 }
 
+// ReadmeStored Message:
+// This message is published when the README is successfully stored in blob storage.
+// It is used to trigger the creation of a pull request for the stored README.
+// Message Publisher: AzureGenie
+// Message Handler:
+// - Hubber: Commits the README to a branch and creates a pull request.
+message ReadmeStored {}
+
+// DevPlanRequested Message:
+// This message is published when the Developer Lead is assigned a task to generate a development plan.
+// It is triggered by the Hubber agent in response to a `NewAsk` event.
+// Message Publisher: Hubber
+// Message Handler: DeveloperLead:
+//  Uses AI capabilities to generate a development plan based on the user's request.
 message DevPlanRequested {
-  string org = 1;
-  string repo = 2;
-  int64 issue_number = 3;
-  string ask = 4;
+  // The user's name
+  string user_name = 11;
+  // The user's natural language request or description of the task.
+  string user_message = 2;
 }
 
+// DevPlanGenerated Message:
+// This message is published when the Developer Lead agent generates a development plan.
+// It is used to provide the generated plan to the Hubber agent for further processing.
+// Message Publisher: DeveloperLead
+// Message Handler: Hubber:
+//  Posts the development plan as a comment on the GitHub issue.
 message DevPlanGenerated {
-  string org = 1;
-  string repo = 2;
-  int64 issue_number = 3;
-  string plan = 4;
+  // The generated development plan content.
+  string dev_plan = 1;
 }
 
-message CodeGenerated {
-  string org = 1;
-  string repo = 2;
-  int64 issue_number = 3;
-  string code = 4;
-}
-
-message DevPlanChainClosed {
-  string plan = 1;
-}
-
-message ReadmeStored {
-  string org = 1;
-  string repo = 2;
-  int64 issue_number = 3;
-  int64 parent_number = 4;
-}
-
-message SandboxRunFinished {
-  string user_id = 1;
-  string user_message = 2;
-}
-
-message CodeCreated {
-  string code = 1;
-}
-
+// DevPlanCreated Message:
+// This message is published when the development plan is finalized and ready for task breakdown.
+// It is used to trigger the creation of tasks for individual developers.
+// Message Publisher: DeveloperLead
+// Message Handler:
+// - Hubber: Creates GitHub issues for each subtask in the development plan.
 message DevPlanCreated {
-  string org = 1;
-  string repo = 2;
-  int64 issue_number = 3;
-  string plan = 4;
+  // The finalized development plan content.
+  string dev_plan = 1;
 }
 
-message SandboxRunCreated {
-  string user_id = 1;
+// DevPlanIssueClosed Message:
+// This message is published when the user approves the development plan and closes the issue.
+// It signals the end of the development plan generation workflow.
+// Message Publisher: GitHubWebHookProcessor
+// Message Handler:
+// - DeveloperLead: Finalizes the development plan and prepares it for task breakdown.
+message DevPlanIssueClosed {
+  // The user's name
+  string user_name = 1;
+  // The user's natural language request or description of the task.
+  string user_message = 2;
+  // The finalized development plan content.
+  string dev_plan = 3;
+}
+
+// CodeGenerationRequested Message:
+// This message is published when a developer is assigned a task to generate code for a specific subtask.
+// It is triggered by the Hubber agent in response to a `DevPlanCreated` event.
+// Message Publisher: Hubber
+// Message Handler:
+// - Developer: Uses AI capabilities to generate code for the assigned subtask.
+message CodeGenerationRequested {
+  // The user's name
+  string user_name = 1;
+  // The user's natural language request or description of the task.
   string user_message = 2;
 }
-    
+
+// CodeGenerated Message:
+// This message is published when a developer generates code for a specific subtask.
+// It is used to provide the generated code to the Hubber agent for further processing.
+// Message Publisher: Developer
+// Message Handler:
+// - Hubber: Posts the generated code as a comment on the GitHub issue.
+message CodeGenerated {
+  // The issue number of the GitHub issue.
+  int64 issue_number = 1;
+  // The generated code content.
+  string code = 2;
+}
+
+// CodeIssueClosed Message:
+// This message is published when the user approves the generated code and closes the issue.
+// It signals the end of the code generation workflow.
+// Message Publisher: GitHubWebHookProcessor
+// Message Handler:
+// - Developer: Finalizes the code and prepares it for storage and testing.
+message CodeIssueClosed {
+  // The user name of the person who approved the code.
+  string user_name = 1;
+  // The user's message or comment approving the code.
+  string user_message = 2;
+  // The finalized code content.
+  string code = 3;
+}
+
+// CodeCreated Message:
+// This message is published when the code is finalized and ready for storage and testing.
+// It is used to trigger the storage of the code in blob storage and the scheduling of a sandbox run.
+// Message Publisher: Developer
+// Message Handler: AzureGenie:
+//  - Stores the code in blob storage and schedules a sandbox run.
+message CodeCreated {
+  // The user name of the person who approved the code.
+  string user_name = 1;
+  // The user's message or comment indicating the completion of the code generation.
+  string user_message = 2;
+  // The finalized code content.
+  string code = 3;
+}
+
+// SandboxRunFinished Message:
+// This message is published when a sandbox run is completed.
+// It is used to trigger the finalization of the code and its integration into the repository.
+// Message Publisher: Sandbox
+// Message Handler:
+// - Hubber: Commits the code to a branch and creates a pull request.
+message SandboxRunFinished {
+  // The user name of the person who initiated the sandbox run.
+  string user_name = 1;
+  // The user's message or comment indicating the completion of the sandbox run.
+  string user_message = 2;
+}
+
+// SandboxRunCreated Message:
+// This message is published when a sandbox run is successfully scheduled.
+// It is used to trigger the monitoring of the sandbox run.
+// Message Publisher: AzureGenie
+// Message Handler:
+// - Sandbox: Monitors the sandbox run and checks for completion.
+message SandboxRunCreated {
+  // The user name of the person who initiated the sandbox run.
+  string user_name = 1;
+  // The user's message or comment initiating the sandbox run.
+  string user_message = 2;
+}

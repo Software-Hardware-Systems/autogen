@@ -6,6 +6,68 @@ Forward leaning preview infrastructure is used in this sample.
 - [Github App and Repositories](#how-do-i-setup-the-github-app)
 - [Azure Resources](#how-do-I-deploy-the-azure-bits)
 
+- GitHub repository where you have permissions to
+  1. Create and install a GitHub App
+  2. Create labels
+
+- Azure account with permissions to create resources
+  1. Azure OpenAI resource
+  2. Azure Container Apps resource
+  3. Azure Storage Account
+
+### Expanded Workflow
+
+### GitHub Events vs. Internal Messages
+
+- **GitHub Events**: These are external events originating from GitHub, such as:
+  - Issue created: Triggers initiation of an agentic workflow.
+  - Issue comment: Used for bidirectional human/agentic communication.
+  - Issue closed: Triggers completion of an agentic workflow.
+
+- **Internal Messages**: These are messages used for communication between agents in the DevTeam system, such as:
+  - `NewAsk`: Initiates the workflow.
+  - `ReadmeRequested`: Requests the generation of a README.
+  - `DevPlanRequested`: Requests the generation of a development plan.
+
+    - **README Generation**:
+      1. `NewAsk` is published when a new GitHub issue is created.
+      2. `ReadmeRequested` is published to request a README.
+      3. `ReadmeGenerated` is published with the generated README.
+      4. `ReadmeIssueClosed` is published when the README is approved.
+      5. `ReadmeStored` is published when the README is stored in blob storage.
+
+    - **Development Plan Generation**:
+      1. `DevPlanRequested` is published to request a development plan.
+      2. `DevPlanGenerated` is published with the generated plan.
+      3. `DevPlanIssueClosed` is published when the plan is approved.
+      4. `DevPlanCreated` is published to create subtasks for developers.
+
+    - **Code Generation**:
+      1. `CodeGenerationRequested` is published to request code for a subtask.
+      2. `CodeGenerated` is published with the generated code.
+      3. `CodeIssueClosed` is published when the code is approved.
+      4. `CodeCreated` is published to store the code and schedule a sandbox run.
+      5. `SandboxRunCreated` and `SandboxRunFinished` are used to monitor and finalize the sandbox run.
+
+    ### GitHub Events vs. Internal Messages
+
+    - **GitHub Events**: These are external events originating from GitHub, such as:
+      - Issue created: Triggers the `NewAsk` message.
+      - Issue comment: Used to provide feedback or approve generated artifacts.
+
+    - **Internal Messages**: These are messages used for communication between agents in the DevTeam system, such as:
+      - `NewAsk`: Initiates the workflow.
+      - `ReadmeRequested`: Requests the generation of a README.
+      - `DevPlanRequested`: Requests the generation of a development plan.
+
+### Additional Messages
+
+- **ReadmeStored**: Published when the README is successfully stored in blob storage. Triggers the creation of a pull request.
+- **DevPlanCreated**: Published when the development plan is finalized. Used to create subtasks for developers.
+- **CodeGenerated**: Published when code is generated for a specific subtask. Used to provide the generated code to the `Hubber` agent.
+- **SandboxRunCreated**: Published when a sandbox run is scheduled. Used to monitor the sandbox run.
+- **SandboxRunFinished**: Published when a sandbox run is completed. Used to finalize the code and integrate it into the repository.
+
 ### What is this sample about?
 
 This sample demonstrates a proof of concept for integrating AI Agents into a software development team, showcasing how AI can assist in various development tasks. The solution leverages Microsoft Aspire for building distributed applications, Microsoft AutoGen as the AI Agent framework, and Chat Completion/Inference Endpoints for providing intelligence and decision-making capabilities.
@@ -32,9 +94,6 @@ We use [Azure AI Services](https://learn.microsoft.com/en-us/azure/ai-services/)
 
 ### How do I setup the Github app?
 
-- [Install the Github app](https://docs.github.com/en/apps/using-github-apps/installing-your-own-github-app)
-- [Create labels for the dev team skills](#which-labels-should-i-create)
-
 - [Register a Github app](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app), with the options listed below:
     - Give your App a name and add a description
     - Homepage URL: Can be anything (Example: repository URL)
@@ -51,6 +110,9 @@ We use [Azure AI Services](https://learn.microsoft.com/en-us/azure/ai-services/)
         - Issue comment
     - Allow this app to be installed by any user or organization
     
+- [Install the Github app](https://docs.github.com/en/apps/using-github-apps/installing-your-own-github-app)
+- [Create labels for the dev team skills](#which-labels-should-i-create)
+
 - After the app is created, generate a private key, we'll use it later for authentication to Github from the app
 
 ### Which labels should I create?

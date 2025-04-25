@@ -1,9 +1,9 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Program.cs
 
-using Azure.AI.Inference;
+//using System.Security.Cryptography.X509Certificates;
+using System.Security.Cryptography.X509Certificates;
 using Azure.Identity;
-using DevTeam.Agents;
 using DevTeam.Backend;
 using DevTeam.Backend.Agents;
 using DevTeam.Backend.Agents.Developer;
@@ -14,47 +14,95 @@ using DevTeam.Options;
 using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
 using Microsoft.AutoGen.Core.Grpc;
+using Microsoft.AutoGen.Extensions.SemanticKernel;
 using Microsoft.AutoGen.Protobuf;
 using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.Options;
-using Microsoft.SemanticKernel.Memory;
 using Octokit.Webhooks;
 using Octokit.Webhooks.AspNetCore;
 
+// Configure the web application builder.
 var webAppBuilder = WebApplication.CreateBuilder(args);
 
-// Add user secrets
+// Add user secrets for secure storage of sensitive information.
 webAppBuilder.Configuration.AddUserSecrets<Program>();
 
-// Add logging configuration
+// Configure logging to use console, debug, and configuration-based settings.
 webAppBuilder.Logging.ClearProviders();
 webAppBuilder.Logging.AddConsole();
 webAppBuilder.Logging.AddDebug();
 webAppBuilder.Logging.AddConfiguration(webAppBuilder.Configuration.GetSection("Logging"));
 
-// Service Defaults for Aspire, SemanticKernel, and ChatCompletionsClient
-webAppBuilder.AddServiceDefaults();
-webAppBuilder.Services.AddHttpClient();
-webAppBuilder.Services.AddControllers();
-webAppBuilder.Services.AddSwaggerGen();
+webAppBuilder.WebHost.ConfigureKestrel(options =>
+{
+    options.ConfigureHttpsDefaults(httpsOptions =>
+    {
+        httpsOptions.SslProtocols = System.Security.Authentication.SslProtocols.Tls12
+            | System.Security.Authentication.SslProtocols.Tls13;
 
-// Grpc
+        // Load the certificate from configuration
+        var certPath = webAppBuilder.Configuration["DevCert:Path"];
+        var certPassword = webAppBuilder.Configuration["DevCert:Password"];
+        if (!string.IsNullOrEmpty(certPath) && !string.IsNullOrEmpty(certPassword))
+        {
+            httpsOptions.ServerCertificate = new X509Certificate2(certPath, certPassword);
+        }
+        else
+        {
+            throw new InvalidOperationException("Certificate path or password is not configured.");
+        }
+    });
+
+    // Ensure Kestrel listens on the required ports
+    //options.ListenLocalhost(5244, listenOptions =>
+    //{
+    //    listenOptions.UseHttps();
+    //});
+});
+
+webAppBuilder.AddServiceDefaults();
+
+// Azure.AI is used for chat completion services
+webAppBuilder.AddChatCompletionService("AIClientOptions");
+
+// Semantic Kernel is used for VectorMemory for knowledge documents
+webAppBuilder.ConfigureSemanticKernel();
+
+// Add gRPC services and configure the gRPC client to connect to the Agent-Host.
 webAppBuilder.Services.AddGrpc();
 webAppBuilder.Services.AddGrpcClient<AgentRpc.AgentRpcClient>(options =>
 {
-    options.Address = new Uri(webAppBuilder.Configuration["AGENT_HOST"]!);
-});
-webAppBuilder.Services.AddSingleton<GrpcAgentRuntime>();
+    // Ensure the AGENT_HOST configuration key is set to a valid URI.
+    var agentHost = webAppBuilder.Configuration["AGENT_HOST"];
+    if (string.IsNullOrEmpty(agentHost))
+    {
+        throw new InvalidOperationException("The AGENT_HOST configuration is missing or invalid.");
+    }
 
-// GitHub
+    options.Address = new Uri(agentHost);
+});
+
+// Register the GrpcAgentRuntime, which manages the gRPC runtime for agents.
+webAppBuilder.Services.AddSingleton<GrpcAgentRuntime>();
+// Register the GrpcAgentRuntime as the implementation for IAgentRuntime.
+webAppBuilder.Services.AddSingleton<IAgentRuntime, GrpcAgentRuntime>();
+
+// Configure GitHub options and validate them on startup.
 webAppBuilder.Services.AddOptions<GithubOptions>()
     .Configure<IConfiguration>((settings, configuration) =>
     {
-        configuration.GetSection("GitHub").Bind(settings);
+        configuration.GetSection("GithubOptions").Bind(settings);
     })
     .ValidateDataAnnotations()
-    .ValidateOnStart();
-webAppBuilder.Services.AddSingleton<GithubAuthService>();
+    .ValidateOnStart()
+    .PostConfigure(options =>
+    {
+        if (string.IsNullOrEmpty(options.WebhookSecret))
+        {
+            Console.WriteLine("Warning: GitHub WebhookSecret is not configured.");
+        }
+    });
+
 webAppBuilder.Services.AddTransient(s =>
 {
     var ghOptions = s.GetRequiredService<IOptions<GithubOptions>>();
@@ -63,48 +111,24 @@ webAppBuilder.Services.AddTransient(s =>
     var client = ghService.GetGitHubClient();
     return client;
 });
-webAppBuilder.Services.AddSingleton<WebhookEventProcessor, GithubWebHookProcessor>();
-webAppBuilder.Services.AddSingleton<IManageGithub, GithubService>();
 
-// Azure
+// Configure Azure clients for interacting with Azure resources.
 webAppBuilder.Services.AddAzureClients(clientBuilder =>
 {
     clientBuilder.AddArmClient(default);
     clientBuilder.UseCredential(new DefaultAzureCredential());
 });
+
+// Register other application services.
+webAppBuilder.Services.AddSingleton<WebhookEventProcessor, GithubWebHookProcessor>();
+webAppBuilder.Services.AddSingleton<IManageGithub, GithubService>();
 webAppBuilder.Services.AddSingleton<IManageAzure, AzureService>();
 
-// AutoGen Core IAgent used to perform LLM Inference
-webAppBuilder.Services.AddSingleton<AutoGen.Core.IAgent, AutoGen.AzureAIInference.ChatCompletionsClientAgent>(sp =>
-{
-    // The Inference Agent created should be a function of the AutoGen Agent purpose
-    // Dev, ProductManager, DeveloperLead, etc.
-    // Consider a factory pattern to create the appropriate Inference Agent
-    // That way any of the ChatCompletionsClient implementations can be injected into AiAgent and used for inference
-    // The factory should look for available configuration values and use them to determine which implementation to create
-    // Right now we're hard coded for Azure AI Inference
-    var chatCompletionsClient = sp.GetRequiredService<ChatCompletionsClient>();
-    return new AutoGen.AzureAIInference.ChatCompletionsClientAgent(chatCompletionsClient, "CoreInferenceAgent", "gpt-4o-mini");
-});
-
-// Register the Hubber agent and its dependencies
-webAppBuilder.Services.AddSingleton<Hubber>(sp =>
-{
-    var ghService = sp.GetRequiredService<IManageGithub>();
-    var semanticTextMemory = sp.GetRequiredService<ISemanticTextMemory>();
-    var coreAgent = sp.GetRequiredService<AutoGen.Core.IAgent>();
-    var hostApplicationLifetime = sp.GetRequiredService<IHostApplicationLifetime>();
-    var id = new Microsoft.AutoGen.Contracts.AgentId("Hubber", "default");
-    var runtime = sp.GetRequiredService<IAgentRuntime>();
-    var logger = sp.GetRequiredService<ILogger<AiAgent<Hubber>>>();
-    return new Hubber(ghService, semanticTextMemory, coreAgent, hostApplicationLifetime, id, runtime, logger);
-});
-
-// Register AiAgent<Hubber>
-webAppBuilder.Services.AddSingleton<AiAgent<Hubber>>(sp => sp.GetRequiredService<Hubber>());
-
+// Build the application.
 var app = webAppBuilder.Build();
 
+// Configure the AgentsAppBuilder to register agents with the gRPC Agent-Host.
+// This demonstrates how to register multiple agents for the sample application.
 AgentsAppBuilder agentsAppBuilder = new AgentsAppBuilder();
 agentsAppBuilder.AddGrpcAgentWorker(webAppBuilder.Configuration["AGENT_HOST"]!)
     .AddAgent<AzureGenie>(nameof(AzureGenie))
@@ -114,19 +138,26 @@ agentsAppBuilder.AddGrpcAgentWorker(webAppBuilder.Configuration["AGENT_HOST"]!)
     .AddAgent<ProductManager>(nameof(ProductManager))
     .AddAgent<DeveloperLead>(nameof(DeveloperLead));
 
-app.MapDefaultEndpoints();
+// Map default endpoints for the application.
+AspireHostingExtensions.MapDefaultEndpoints(app);
+
+// Configure routing and endpoints for GitHub webhooks and gRPC services.
 app.UseRouting()
-.UseEndpoints(endpoints =>
-{
-    var ghOptions = app.Services.GetRequiredService<IOptions<GithubOptions>>().Value;
-    endpoints.MapGitHubWebhooks(secret: ghOptions.WebhookSecret);
-    endpoints.MapGrpcService<GrpcAgentService>();
-});
+   .UseEndpoints(endpoints =>
+   {
+       var ghOptions = app.Services.GetRequiredService<IOptions<GithubOptions>>().Value;
+       endpoints.MapGitHubWebhooks(secret: ghOptions.WebhookSecret);
 
-app.UseSwagger();
-/* app.UseSwaggerUI(c =>
-{
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
-}); */
+       // Map the gRPC service to handle gRPC requests.
+       endpoints.MapGrpcService<GrpcAgentService>();
+   });
 
+// Enable Swagger for API documentation.
+//app.UseSwagger();
+//app.UseSwaggerUI(c =>
+//{
+//    c.SwaggerEndpoint("/swagger/v1/swagger.json", "DevTeam API V1");
+//});
+
+// Run the application.
 app.Run();

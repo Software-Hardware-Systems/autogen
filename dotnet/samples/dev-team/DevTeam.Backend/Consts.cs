@@ -3,7 +3,19 @@
 
 namespace DevTeam.Backend;
 
-public class Consts
+public class SkillType
 {
-    public const string TopicName = "devteam";
+    public const string DevTeam = "DevTeam";
+    public const string StakeHolder = "StakeHolder";
+    public const string ProductOwner = "ProductOwner";
+    public const string DeveloperLead = "DevLead";
+    public const string Developer = "Dev";
+    public const string Hubber = "Hubber";
+    public const string AzureGenie = "AzureGenie";
+    public const string Sandbox = "Sandbox";
+}
+
+public class StakeHolderSkills
+{
+    public const string Ask = "Ask";
 }

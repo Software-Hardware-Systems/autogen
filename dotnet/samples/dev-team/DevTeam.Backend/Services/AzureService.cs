@@ -72,40 +72,48 @@ public class AzureService : IManageAzure
     {
         try
         {
-            var runId = $"sk-sandbox-{org}-{repo}-{parentIssueNumber}-{issueNumber}".ToUpperInvariant();
+            var sandboxId = $"sk-sandbox-{org}-{repo}-{parentIssueNumber}-{issueNumber}".ToUpperInvariant();
+
             var resourceGroupResourceId = ResourceGroupResource.CreateResourceIdentifier(_azSettings.SubscriptionId, _azSettings.ContainerInstancesResourceGroup);
             var resourceGroupResource = _client.GetResourceGroupResource(resourceGroupResourceId);
             var scriptPath = $"/azfiles/output/{org}-{repo}/{parentIssueNumber}/{issueNumber}/run.sh";
-            var collection = resourceGroupResource.GetContainerGroups();
-            var data = new ContainerGroupData(new AzureLocation(_azSettings.Location), new ContainerInstanceContainer[]
-            {
-                    new ContainerInstanceContainer(runId, _azSettings.SandboxImage,new ContainerResourceRequirements(new ContainerResourceRequestsContent(1.5,1)))
+            var containerGroups = resourceGroupResource.GetContainerGroups();
+            var containerGroupData = new ContainerGroupData(
+                new AzureLocation(_azSettings.Location),
+                new ContainerInstanceContainer[]
+                {
+                    new ContainerInstanceContainer(
+                        sandboxId,
+                        _azSettings.SandboxImage,
+                        new ContainerResourceRequirements(new ContainerResourceRequestsContent(1.5,1)))
                     {
                         Command = { "/bin/bash", $"{scriptPath}" },
                         VolumeMounts =
                         {
                             new ContainerVolumeMount("azfiles","/azfiles/")
                             {
-                                IsReadOnly = false,
+                                IsReadOnly = false
                             }
-                        },
-                    }}, ContainerInstanceOperatingSystemType.Linux)
+                        }
+                    }
+                },
+                ContainerInstanceOperatingSystemType.Linux)
             {
                 Volumes =
-                                            {
-                                                new ContainerVolume("azfiles")
-                                                {
-                                                    AzureFile = new ContainerInstanceAzureFileVolume(_azSettings.FilesShareName,_azSettings.FilesAccountName)
-                                                    {
-                                                        StorageAccountKey = _azSettings.FilesAccountKey
-                                                    },
-                                                },
-                                            },
+                {
+                    new ContainerVolume("azfiles")
+                    {
+                        AzureFile = new ContainerInstanceAzureFileVolume(_azSettings.FilesShareName,_azSettings.FilesAccountName)
+                        {
+                            StorageAccountKey = _azSettings.FilesAccountKey
+                        }
+                    }
+                },
                 RestartPolicy = ContainerGroupRestartPolicy.Never,
                 Sku = ContainerGroupSku.Standard,
                 Priority = ContainerGroupPriority.Regular
             };
-            await collection.CreateOrUpdateAsync(WaitUntil.Completed, runId, data);
+            await containerGroups.CreateOrUpdateAsync(WaitUntil.Completed, sandboxId, containerGroupData);
         }
         catch (Exception ex)
         {
@@ -115,9 +123,9 @@ public class AzureService : IManageAzure
 
     }
 
-    public async Task Store(string org, string repo, long parentIssueNumber, long issueNumber, string filename, string extension, string dir, string output)
+    public async Task Store(string org, string repo, long parentIssueNumber, long issueNumber, string filename, string extension, string dir, string content)
     {
-        ArgumentNullException.ThrowIfNull(output);
+        ArgumentNullException.ThrowIfNull(content);
 
         try
         {
@@ -142,7 +150,7 @@ public class AzureService : IManageAzure
             var file = directory.GetFileClient(fileName);
             // hack to enable script to save files in the same directory
             var cwdHack = "#!/bin/bash\n cd $(dirname $0)";
-            var contents = extension == "sh" ? output.Replace("#!/bin/bash", cwdHack, StringComparison.Ordinal) : output;
+            var contents = extension == "sh" ? content.Replace("#!/bin/bash", cwdHack, StringComparison.Ordinal) : content;
             using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(contents)))
             {
                 await file.CreateAsync(stream.Length);

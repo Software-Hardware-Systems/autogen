@@ -1,83 +1,73 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // DeveloperLead.cs
 
-using AutoGen.Core;
 using DevTeam.Agents;
 using DevTeam.Backend.Agents.Developer;
 using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
 using Microsoft.AutoGen.RuntimeGateway.Grpc.Tests;
+using Microsoft.Extensions.AI;
 using Microsoft.SemanticKernel.Memory;
 
 namespace DevTeam.Backend.Agents.DeveloperLead;
 
-[TypeSubscription(Consts.TopicName)]
+[TypeSubscription(SkillType.DeveloperLead)]
 public class DeveloperLead(
     [FromKeyedServices("AgentsMetadata")] AgentsMetadata agentsMetadata,
-    IPersistentState<DeveloperLeadMetadata> state,
     ISemanticTextMemory semanticTextMemory,
-    AutoGen.Core.IAgent coreAgent,
-    IHostApplicationLifetime hostApplicationLifetime,
+    IChatClient chatClient,
     AgentId id,
     IAgentRuntime runtime,
     Logger<AiAgent<DeveloperLead>>? logger = null)
     :
-    AiAgent<DeveloperLead>(semanticTextMemory, coreAgent, hostApplicationLifetime, id, runtime, logger),
+    AiAgent<DeveloperLead>(semanticTextMemory, chatClient, id, runtime, logger),
     ILeadDevelopers,
     IHandle<DevPlanRequested>,
-    IHandle<DevPlanChainClosed>
+    IHandle<DevPlanIssueClosed>
 {
-    public async ValueTask HandleAsync(DevPlanRequested item, MessageContext messageContext)
+    public async ValueTask HandleAsync(DevPlanRequested devPlanRequested, MessageContext messageContext)
     {
-        var planCandidate = await CreatePlan(item.Ask);
-        state.State.PlanCandidates.Add(planCandidate);
+        var planCandidate = await CreatePlan(devPlanRequested.UserName, devPlanRequested.UserMessage);
 
-        // TODO: Read the Topic from the agent metadata
-        // TODO: Should we use the topic from the message context?
-        // TODO: How to handle multiple topics?
         // Get the topic from the agent metadata
         var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
-        var topic = topics?.FirstOrDefault() ?? Consts.TopicName;
+        // TODO: How to handle multiple topics?
+        var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
 
         await PublishMessageAsync(
             new DevPlanGenerated
             {
-                Org = item.Org,
-                Repo = item.Repo,
-                IssueNumber = item.IssueNumber,
-                Plan = planCandidate
+                DevPlan = planCandidate
             },
             topic: messageContext.Topic ?? new TopicId(topic)
         ).ConfigureAwait(false);
     }
 
-    public async ValueTask HandleAsync(DevPlanChainClosed item, MessageContext messageContext)
+    public async ValueTask HandleAsync(DevPlanIssueClosed devPlanIssueClosed, MessageContext messageContext)
     {
-        var lastPlan = state.State.PlanCandidates.Last();
-        // TODO: Read the Topic from the agent metadata
-        // TODO: Should we use the topic from the message context?
-        // TODO: How to handle multiple topics?
         // Get the topic from the agent metadata
         var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
-        var topic = topics?.FirstOrDefault() ?? Consts.TopicName;
+        // TODO: How to handle multiple topics?
+        var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
 
         await PublishMessageAsync(
             new DevPlanCreated
             {
-                Plan = lastPlan
+                DevPlan = devPlanIssueClosed.DevPlan
             },
             topic: messageContext.Topic ?? new TopicId(topic)
         ).ConfigureAwait(false);
     }
 
-    public async Task<string> CreatePlan(string ask)
+    public async Task<string> CreatePlan(string authorName, string authorAsk)
     {
         try
         {
-            var context = state.State.ChatHistory.ToString() ?? "";
-            var instruction = "Consider the following architectural guidelines:!waf!";
-            await AddKnowledge(instruction, context);
-            return await CallFunction(DevLeadSkills.Plan);
+            string taskSpecificInstructions = "Consider the following guidelines";
+            string knowledgeCollection = "Microsoft Azure Well-Architected Framework";
+            await AddKnowledgeInstructions(taskSpecificInstructions, knowledgeCollection);
+
+            return await GenerateResponseUsing(DeveloperLeadSkills.Plan, authorName, authorAsk);
         }
         catch (Exception ex)
         {
@@ -87,13 +77,7 @@ public class DeveloperLead(
     }
 }
 
-public class DeveloperLeadMetadata
-{
-    public List<string> PlanCandidates { get; set; } = new();
-    public List<IMessage> ChatHistory { get; set; } = new();
-}
-
 public interface ILeadDevelopers
 {
-    public Task<string> CreatePlan(string ask);
+    public Task<string> CreatePlan(string authorName, string authorAsk);
 }

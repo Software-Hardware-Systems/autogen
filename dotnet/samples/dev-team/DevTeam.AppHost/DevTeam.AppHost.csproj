@@ -1,10 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- Use the Aspire AppHost SDK to simplify hosting configuration. -->
   <Sdk Name="Aspire.AppHost.Sdk" Version="9.0.0" />
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-        <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsAspireHost>true</IsAspireHost>
@@ -12,15 +13,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Aspire hosting packages for application insights, Python, and Orleans. -->
+    <PackageReference Include="Aspire.Hosting" />
     <PackageReference Include="Aspire.Hosting.AppHost" />
     <PackageReference Include="Aspire.Hosting.Azure.ApplicationInsights" />
     <PackageReference Include="Aspire.Hosting.Azure.CognitiveServices" />
     <PackageReference Include="Aspire.Hosting.Orleans" />
     <PackageReference Include="Aspire.Hosting.Python" />
     <PackageReference Include="Aspire.Hosting.Qdrant" />
+
+    <!-- Add gRPC dependencies for hosting gRPC services. -->
+    <PackageReference Include="Grpc.AspNetCore" />
   </ItemGroup>
 
-   <ItemGroup>
+  <ItemGroup>
+    <!-- Project references for the backend and agent host. -->
     <ProjectReference Include="..\..\..\src\Microsoft.AutoGen\AgentHost\Microsoft.AutoGen.AgentHost.csproj" />
     <ProjectReference Include="..\DevTeam.Backend\DevTeam.Backend.csproj" />
   </ItemGroup>

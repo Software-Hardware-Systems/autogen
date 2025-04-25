@@ -2,11 +2,12 @@
   "profiles": {
     "DevTeam.Backend": {
       "commandName": "Project",
-      "launchBrowser": true,
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "https://localhost:50672;http://localhost:50674",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
-      },
-      "applicationUrl": "https://localhost:50672;http://localhost:50674"
+      }
     }
   }
 }

@@ -1,79 +1,72 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Developer.cs
 
-using AutoGen.Core;
 using DevTeam.Agents;
 using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
 using Microsoft.AutoGen.RuntimeGateway.Grpc.Tests;
+using Microsoft.Extensions.AI;
 using Microsoft.SemanticKernel.Memory;
 
 namespace DevTeam.Backend.Agents.Developer;
 
-[TypeSubscription(Consts.TopicName)]
+[TypeSubscription(SkillType.Developer)]
 public class Dev(
     [FromKeyedServices("AgentsMetadata")] AgentsMetadata agentsMetadata,
-    IPersistentState<DeveloperMetadata> state,
-
     ISemanticTextMemory semanticTextMemory,
-    AutoGen.Core.IAgent coreAgent,
-    IHostApplicationLifetime hostApplicationLifetime,
+    IChatClient chatClient,
     AgentId id,
     IAgentRuntime runtime,
     Logger<AiAgent<Dev>>? logger = null)
     :
-    AiAgent<Dev>(semanticTextMemory, coreAgent, hostApplicationLifetime, id, runtime, logger),
+    AiAgent<Dev>(semanticTextMemory, chatClient, id, runtime, logger),
     IDevelopApps,
     IHandle<CodeGenerationRequested>,
-    IHandle<CodeChainClosed>
+    IHandle<CodeIssueClosed>
 {
-    public async ValueTask HandleAsync(CodeGenerationRequested item, MessageContext messageContext)
+    public async ValueTask HandleAsync(CodeGenerationRequested codeGenerationRequested, MessageContext messageContext)
     {
-        var code = await GenerateCode(item.Ask);
-        // TODO: Read the Topic from the agent metadata
+        var code = await GenerateCode(codeGenerationRequested.UserName, codeGenerationRequested.UserMessage);
+
         // Get the topic from the agent metadata
         var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
         // TODO: How to handle multiple topics?
-        var topic = topics?.FirstOrDefault() ?? Consts.TopicName;
+        var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
 
         await PublishMessageAsync(
             new CodeGenerated
             {
-                Org = item.Org,
-                Repo = item.Repo,
-                IssueNumber = item.IssueNumber,
                 Code = code
             },
             topic: messageContext.Topic ?? new TopicId(topic)
         ).ConfigureAwait(false);
     }
 
-    public async ValueTask HandleAsync(CodeChainClosed item, MessageContext messageContext)
+    public async ValueTask HandleAsync(CodeIssueClosed codeIssueClosed, MessageContext messageContext)
     {
-        var lastCode = state.State.CodeCandidates.Last().GetContent();
-        // TODO: Read the Topic from the agent metadata
         // Get the topic from the agent metadata
         var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
         // TODO: How to handle multiple topics?
-        var topic = topics?.FirstOrDefault() ?? Consts.TopicName;
+        var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
 
         await PublishMessageAsync(
             new CodeCreated
             {
-                Code = lastCode
+                Code = codeIssueClosed.Code
             },
             topic: messageContext.Topic ?? new TopicId(topic)
         ).ConfigureAwait(false);
     }
 
-    public async Task<string> GenerateCode(string ask)
+    public async Task<string> GenerateCode(string authorName, string authorAsk)
     {
         try
         {
-            //var context = new KernelArguments { ["input"] = AppendChatHistory(ask) };
-            //var instruction = "Consider the following architectural guidelines:!waf!";
-            //var enhancedContext = await AddKnowledge(instruction, "waf");
-            return await CallFunction(DeveloperSkills.Implement);
+            string taskSpecificInstructions = "Consider the following guidelines";
+            string knowledgeCollection = "Microsoft Azure Well-Architected Framework";
+            await AddKnowledgeInstructions(taskSpecificInstructions, knowledgeCollection);
+
+            return await GenerateResponseUsing(DeveloperSkills.Implement, authorName, authorAsk);
         }
         catch (Exception ex)
         {
@@ -81,15 +74,10 @@ public class Dev(
             return "";
         }
     }
-}
 
-public class DeveloperMetadata
-{
-    public List<IMessage> CodeCandidates { get; set; } = new();
-    public List<IMessage> ChatHistory { get; set; } = new();
 }
 
 public interface IDevelopApps
 {
-    public Task<string> GenerateCode(string ask);
+    public Task<string> GenerateCode(string authorName, string ask);
 }

@@ -1,87 +1,78 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // ProductManager.cs
 
-using AutoGen.Core;
 using DevTeam.Agents;
 using DevTeam.Backend.Agents.Developer;
 using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
 using Microsoft.AutoGen.RuntimeGateway.Grpc.Tests;
+using Microsoft.Extensions.AI;
 using Microsoft.SemanticKernel.Memory;
 
 namespace DevTeam.Backend.Agents.ProductManager;
 
-[TypeSubscription(Consts.TopicName)]
+[TypeSubscription(SkillType.ProductOwner)]
 public class ProductManager(
     [FromKeyedServices("AgentsMetadata")] AgentsMetadata agentsMetadata,
-    IPersistentState<ProductManagerMetadata> state,
     ISemanticTextMemory semanticTextMemory,
-    AutoGen.Core.IAgent coreAgent,
-    IHostApplicationLifetime hostApplicationLifetime,
+    IChatClient chatClient,
     AgentId id,
     IAgentRuntime runtime,
     Logger<AiAgent<ProductManager>>? logger = null)
     :
-    AiAgent<ProductManager>(semanticTextMemory, coreAgent, hostApplicationLifetime, id, runtime, logger),
-    IHandle<ReadmeChainClosed>,
+    AiAgent<ProductManager>(semanticTextMemory, chatClient, id, runtime, logger),
+    IHandle<ReadmeIssueClosed>,
     IHandle<ReadmeRequested>,
     IManageProducts
 {
-    public async ValueTask HandleAsync(ReadmeChainClosed item, MessageContext messageContext)
+    protected sealed class ProductManagerState
     {
-        var lastReadme = state.State.ReadmeHistory.Last();
-        // TODO: Read the Topic from the agent metadata
-        // TODO: Should we use the topic from the message context?
-        // TODO: How to handle multiple topics?
-        // Get the topic from the agent metadata
-        var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
-        var topic = topics?.FirstOrDefault() ?? Consts.TopicName;
-
-        await PublishMessageAsync(
-            new ReadmeCreated
-            {
-                Readme = lastReadme
-            },
-            topic: messageContext.Topic ?? new TopicId(topic)
-        ).ConfigureAwait(false);
+        public AiAgentConversationState ConversationState { get; } = new();
     }
 
-    public async ValueTask HandleAsync(ReadmeRequested item, MessageContext messageContext)
+    public async ValueTask HandleAsync(ReadmeRequested readmeRequested, MessageContext messageContext)
     {
-        state.State.Org = item.Org;
-        state.State.Repo = item.Repo;
-        state.State.IssueNumber = item.IssueNumber;
-        var newReadme = await CreateReadme(item.Ask);
-        state.State.ReadmeHistory.Add(newReadme);
+        var newReadme = await GenerateReadme(readmeRequested.UserName, readmeRequested.UserMessage);
 
-        // TODO: Read the Topic from the agent metadata
-        // TODO: Should we use the topic from the message context?
-        // TODO: How to handle multiple topics?
         // Get the topic from the agent metadata
-        var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
-        var topic = topics?.FirstOrDefault() ?? Consts.TopicName;
+        var topics = agentsMetadata.GetTopicsForAgent(typeof(ProductManager));
+        // TODO: How to handle multiple topics?
+        var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
 
         await PublishMessageAsync(
             new ReadmeGenerated
             {
-                Org = item.Org,
-                Repo = item.Repo,
-                IssueNumber = item.IssueNumber,
                 Readme = newReadme,
             },
             topic: messageContext.Topic ?? new TopicId(topic)
         ).ConfigureAwait(false);
     }
 
-    public async Task<string> CreateReadme(string ask)
+    public async ValueTask HandleAsync(ReadmeIssueClosed readmeIssueClosed, MessageContext messageContext)
+    {
+        // Get the topic from the agent metadata
+        var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
+        // TODO: How to handle multiple topics?
+        var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
+
+        await PublishMessageAsync(
+            new ReadmeCreated
+            {
+                Readme = ConversationState.GetLastGeneration(),
+            },
+            topic: messageContext.Topic ?? new TopicId(topic)
+        ).ConfigureAwait(false);
+    }
+
+    public async Task<string> GenerateReadme(string authorName, string authorAsk)
     {
         try
         {
-            string instruction = "Consider the following architectural guidelines:!waf!";
-            await AddKnowledge(instruction, ask);
+            string taskSpecificInstructions = "Consider the following guidelines";
+            string knowledgeCollection = "Microsoft Azure Well-Architected Framework";
+            await AddKnowledgeInstructions(taskSpecificInstructions, knowledgeCollection);
 
-            // This is what results in the LLM inference in the AiAgent class
-            return await CallFunction(PMSkills.Readme);
+            return await GenerateResponseUsing(PMSkills.Readme, authorName, authorAsk);
         }
         catch (Exception ex)
         {
@@ -91,16 +82,7 @@ public class ProductManager(
     }
 }
 
-public class ProductManagerMetadata
-{
-    public List<IMessage> ChatHistory { get; set; } = new();
-    public List<string> ReadmeHistory { get; set; } = new();
-    public string Org { get; internal set; } = "";
-    public string Repo { get; internal set; } = "";
-    public long IssueNumber { get; internal set; }
-}
-
 public interface IManageProducts
 {
-    public Task<string> CreateReadme(string ask);
+    public Task<string> GenerateReadme(string authorName, string ask);
 }

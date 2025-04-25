@@ -1,93 +1,150 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // AiAgent.cs
 
-using AutoGen.Core;
-using Microsoft.AutoGen.Agents;
+using System.ComponentModel;
+using System.Text;
+using System.Text.Json;
+using Microsoft.AutoGen.AgentChat.State;
 using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
+using Microsoft.Extensions.AI;
 using Microsoft.SemanticKernel.Memory;
 
 namespace DevTeam.Agents;
 
-public class AiAgent<T>(
+public class AiAgent<T> : BaseAgent
+{
+    public AiAgent(
         ISemanticTextMemory semanticTextMemory,
-        AutoGen.Core.IAgent coreAgentUsedForInference,
-        IHostApplicationLifetime hostApplicationLifetime,
+        IChatClient chatClient,
         AgentId id,
         IAgentRuntime runtime,
         ILogger<AiAgent<T>>? logger = null)
         :
-        BaseAgent(id, runtime, nameof(AiAgent<T>), logger),
-        IHandle<NewMessageReceived>,
-        IHandle<ConversationClosed>,
-        IHandle<Shutdown>
-{
-    private IMessage? instructionMessage;
-    private IMessage? userAskMessage;
-
-    public async ValueTask HandleAsync(NewMessageReceived item, MessageContext messageContext)
+        base(id, runtime, nameof(AiAgent<T>), logger)
     {
-        Console.Out.WriteLine(item.Message); // Print message to console
-        await ValueTask.CompletedTask;
+        _semanticTextMemory = semanticTextMemory;
+        _chatClient = chatClient;
+        _chatOptions = new() { Tools = [AIFunctionFactory.Create(RetrieveAdditionalKnowledge)] };
     }
 
-    public async ValueTask HandleAsync(ConversationClosed item, MessageContext messageContext)
+    private ISemanticTextMemory _semanticTextMemory;
+    private IChatClient _chatClient;
+    private ChatOptions _chatOptions;
+
+    protected AiAgentConversationState ConversationState { get; } = new();
+
+    /// <summary>
+    /// Represents the state of an AI agent instance, including a list of chat messages, knowledge instructions, and
+    /// generated responses.
+    /// </summary>
+    protected sealed class AiAgentConversationState
     {
-        var goodbye = $"{item.UserId} said {item.UserMessage}"; // Print goodbye message to console
-        Console.Out.WriteLine(goodbye);
-        if (Environment.GetEnvironmentVariable("STAY_ALIVE_ON_GOODBYE") != "true")
+        public List<string> KnowledgeInstructions { get; } = [];
+        public List<ChatMessage> UserAsks { get; } = [];
+        public List<ChatResponse> Generations { get; } = [];
+        public void AddGeneration(ChatMessage userAsk, ChatResponse generation)
         {
-            // Publish message that will be handled by shutdown handler
-            await this.PublishMessageAsync(new Shutdown(), new TopicId("HelloTopic"));
+            UserAsks.Add(userAsk);
+            Generations.Add(generation);
+        }
+        public string GetLastGeneration()
+        {
+            var lastChatResponse = Generations.LastOrDefault();
+            return lastChatResponse?.Messages.FirstOrDefault()?.Text ?? string.Empty;
         }
     }
 
-    public async ValueTask HandleAsync(Shutdown item, MessageContext messageContext)
+    /// <summary>
+    /// Replace the BaseAgent SaveStateAsync method to save the state of the agent.
+    /// </summary>
+    /// <returns><see cref="ValueTask<JsonElement>"></returns>
+    public override async ValueTask<JsonElement> SaveStateAsync()
     {
-        Console.WriteLine("Shutting down...");
-        hostApplicationLifetime.StopApplication(); // Shuts down application
+        AiAgentConversationState aiAgentSaved = new AiAgentConversationState();
+
+        aiAgentSaved.UserAsks.AddRange(ConversationState.UserAsks.ToList());
+        aiAgentSaved.KnowledgeInstructions.AddRange(ConversationState.KnowledgeInstructions.ToList());
+        aiAgentSaved.Generations.AddRange(ConversationState.Generations.ToList());
+
+        return SerializedState.Create(aiAgentSaved).AsJson();
     }
 
-    protected async Task AddKnowledge(string instruction, string ask)
+    /// <summary>
+    /// Replace the BaseAgent LoadStateAsync
+    /// </summary>
+    /// <param name="state"></param>
+    public override ValueTask LoadStateAsync(JsonElement state)
     {
-        // Search the vector store for relevant information
-        var searchResults = semanticTextMemory.SearchAsync("waf", ask, limit: 5);
+        var aiAgentLoaded = new SerializedState(state).As<AiAgentConversationState>();
 
-        // Extract the relevant information from the search results
-        var knowledge = string.Join("\n", searchResults.Select(result => result.Metadata.Text));
+        ConversationState.UserAsks.Clear();
+        ConversationState.UserAsks.AddRange(aiAgentLoaded.UserAsks.ToList());
+        ConversationState.KnowledgeInstructions.Clear();
+        ConversationState.KnowledgeInstructions.AddRange(aiAgentLoaded.KnowledgeInstructions.ToList());
+        ConversationState.Generations.Clear();
+        ConversationState.Generations.AddRange(aiAgentLoaded.Generations.ToList());
 
-        // Create and add messages to chat history
-        userAskMessage = new AutoGen.Core.TextMessage(Role.User, ask, "user");
-
-        instructionMessage = new AutoGen.Core.TextMessage(Role.System, $"{instruction}\n{knowledge}", "system");
+        return ValueTask.CompletedTask;
     }
 
-    protected async Task<string> CallFunction(string prompt)
+    protected async Task AddKnowledgeInstructions(string instruction, string knowledgeCollection)
     {
-        IMessage message = new AutoGen.Core.TextMessage(
-            Role.Assistant,
-            prompt,
-            "assistant");
+        ConversationState.KnowledgeInstructions.Add($"{instruction}: {knowledgeCollection}");
 
-        List<IMessage> promptMessages = new List<IMessage> { message };
-        if (instructionMessage != null) { promptMessages.Add(instructionMessage); }
-        if (userAskMessage != null) { promptMessages.Add(userAskMessage); }
+        // ToDo: Add code similar to the Seed project that creates the knowledge collection data
+        // This may be a candidate task for MagenticOne
+        // This will entail:
+        // Understanding the knowledgeCollection argument
+        // Searching the file system or web for the corresponding document information
+        // Parsing/Chunking the information
+        // Encoding the information into a vector memory
+        // Periodically checking for updated information and encoding it
+    }
 
-        // Use the AutoGen.Core.IAgent to obtain an LLM inference response
-        var responseMessage = await coreAgentUsedForInference.GenerateReplyAsync(promptMessages);
+    /// <summary>
+    /// A tool made available during ChatClient inference
+    /// </summary>
+    /// <param name="knowledgeCollection">Specifies the source of knowledge to search for relevant information.</param>
+    /// <param name="input">Defines the query or context for which additional knowledge is being sought.</param>
+    /// <param name="limit">Sets the maximum number of knowledge items to retrieve from the collection.</param>
+    /// <returns>Returns a string containing the relevant knowledge or a message indicating its absence.</returns>
+    [Description("Retrieves additional knowledge based on the provided input from a specified collection")]
+    private async Task<string> RetrieveAdditionalKnowledge(string knowledgeCollection, string input, int limit = 5)
+    {
+        IAsyncEnumerable<MemoryQueryResult> retrievedKnowledgeResults = _semanticTextMemory.SearchAsync(knowledgeCollection, input, limit);
 
-        // Extract the content from the responseMessage and return it as a string
-        if (responseMessage is IMessage<string> textResponse)
+        var retrievedKnowledgePromptBuilder = new StringBuilder();
+        await foreach (var retrievedKnowledgeItem in retrievedKnowledgeResults)
         {
-            return textResponse.Content;
+            retrievedKnowledgePromptBuilder.AppendLine(retrievedKnowledgeItem.Metadata.Text);
         }
-        else if (responseMessage is AutoGen.Core.TextMessage textMessage)
+        var retrievedKnowledge = retrievedKnowledgePromptBuilder.ToString();
+
+        return retrievedKnowledge;
+    }
+
+    protected async Task<string> GenerateResponseUsing(string agentPrompt, string UserName, string userAsk)
+    {
+        ChatMessage systemChatMessage = new ChatMessage(ChatRole.System, agentPrompt);
+        systemChatMessage.AuthorName = Description;
+
+        foreach(var knowledgeInstruction in ConversationState.KnowledgeInstructions)
         {
-            return textMessage.Content;
+            systemChatMessage.Contents.Add(new TextContent(knowledgeInstruction));
         }
-        else
-        {
-            throw new InvalidOperationException("Unexpected response message type.");
-        }
+
+        ChatMessage userAskMessage = new ChatMessage(ChatRole.User, userAsk);
+        userAskMessage.AuthorName = UserName;
+
+        List<ChatMessage> generationConversation = [systemChatMessage, .. ConversationState.UserAsks];
+
+        ChatResponse chatResponse = await _chatClient.GetResponseAsync(
+            generationConversation,
+            _chatOptions);
+
+        ConversationState.AddGeneration(userAskMessage, chatResponse);
+
+        return ConversationState.GetLastGeneration();
     }
 }

@@ -10,15 +10,16 @@ public static class PMSkills
         You may include commands to build the applications but do not run them. 
         Do not include any git commands.
         Input: {{$input}}
-        {{$waf}}
+        {{$knowledge}}
        """;
+
     public const string Readme = """
-       You are a program manager on a software development team. You are working on an app described below. 
-        Based on the input below, and any dialog or other context, please output a raw README.MD markdown file documenting the main features of the app and the architecture or code organization. 
+       You are a program manager on a software development team. You are working on an app described in the input below. 
+        Based on the input description, and any dialog or other context, please output a raw README.MD markdown file documenting the main features of the app and the architecture or code organization. 
         Do not describe how to create the application. 
         Write the README as if it were documenting the features and architecture of the application. You may include instructions for how to run the application. 
         Input: {{$input}}
-        {{$waf}}
+        {{$knowledge}}
        """;
 
     public const string Explain = """

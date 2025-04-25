@@ -2,7 +2,7 @@
 // DeveloperLeadPrompts.cs
 
 namespace DevTeam.Backend.Agents.DeveloperLead;
-public static class DevLeadSkills
+public static class DeveloperLeadSkills
 {
     public const string Plan = """
         You are a Dev Lead for an application team, building the application described below. 

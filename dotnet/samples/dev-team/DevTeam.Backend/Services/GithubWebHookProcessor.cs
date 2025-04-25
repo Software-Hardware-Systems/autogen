@@ -2,8 +2,9 @@
 // GithubWebHookProcessor.cs
 
 using System.Globalization;
-using DevTeam.Agents;
-using DevTeam.Backend.Agents;
+using DevTeam.Backend.Agents.Developer;
+using DevTeam.Backend.Agents.DeveloperLead;
+using DevTeam.Backend.Agents.ProductManager;
 using Google.Protobuf;
 using Microsoft.AutoGen.Contracts;
 using Octokit.Webhooks;
@@ -14,10 +15,10 @@ using Octokit.Webhooks.Models;
 
 namespace DevTeam.Backend.Services;
 
-public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logger, AiAgent<Hubber> client) : WebhookEventProcessor
+public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logger, IAgentRuntime agentRuntime) : WebhookEventProcessor
 {
     private readonly ILogger<GithubWebHookProcessor> _logger = logger;
-    private readonly AiAgent<Hubber> _client = client;
+    private readonly IAgentRuntime _agentRuntime = agentRuntime;
 
     protected override async Task ProcessIssuesWebhookAsync(WebhookHeaders headers, IssuesEvent issuesEvent, IssuesAction action)
     {
@@ -31,7 +32,13 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
             var org = issuesEvent.Repository?.Owner.Login ?? throw new InvalidOperationException("Repository owner login is null");
             var repo = issuesEvent.Repository?.Name ?? throw new InvalidOperationException("Repository name is null");
             var issueNumber = issuesEvent.Issue?.Number ?? throw new InvalidOperationException("Issue number is null");
-            var input = issuesEvent.Issue?.Body ?? string.Empty;
+            var userName = issuesEvent.Issue?.User.Name;
+            var userAsk = issuesEvent.Issue?.Body ?? string.Empty;
+
+            _logger.LogInformation($"{userName ?? "Somebody"} {(issuesEvent.Action == IssuesAction.Opened ? "Opened" : "Closed")} {org}-{repo}-{issueNumber} with Labels: {string.Join(",", issuesEvent.Issue?.Labels?.Select(l => l.Name) ?? Array.Empty<string>())}");
+
+            // Note that we do process new issues even if the user is a bot
+
             // Assumes the label follows the following convention: Skill.Function example: PM.Readme
             // Also, we've introduced the Parent label, that ties the sub-issue with the parent issue
             var labels = issuesEvent.Issue?.Labels
@@ -40,29 +47,35 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
                                     .ToDictionary(parts => parts[0], parts => parts[1]);
             if (labels == null || labels.Count == 0)
             {
-                _logger.LogWarning("No labels found in issue. Skipping processing.");
+                _logger.LogWarning("No labels found in issue. Skip processing.");
                 return;
             }
 
-            long? parentNumber = labels.TryGetValue("Parent", out var value) ? long.Parse(value) : null;
-            var skillName = labels.Keys.Where(k => k != "Parent").FirstOrDefault();
-
-            if (skillName == null)
+            // Use the first label with a Skill.Function format
+            var skillType = labels.Keys.Where(k => k != "Parent").FirstOrDefault();
+            if (skillType == null)
             {
-                _logger.LogWarning("No skill name found in issue. Skipping processing.");
+                _logger.LogWarning("No skill type found in issue. Skip processing.");
                 return;
             }
 
-            var suffix = $"{org}-{repo}";
+            // Create a unique topic source which when combined
+            // with a topic type based on the skillType
+            // results in a unique agent instance
+            var topicSource = $"Org.{org}-Repo.{repo}-IssueNumber.{issueNumber.ToString()}";
+            long? parentIssueNumber = labels.TryGetValue("Parent", out var value) ? long.Parse(value, CultureInfo.InvariantCulture) : null;
+            if (parentIssueNumber != null)
+            {
+                topicSource += $"-ParentIssueNumber.{parentIssueNumber.ToString()}";
+            }
+
             if (issuesEvent.Action == IssuesAction.Opened)
             {
-                _logger.LogInformation("Processing HandleNewAsk");
-                await HandleNewAsk(issueNumber, skillName, labels[skillName], suffix, input, org, repo);
+                await HandleNewAsk(userName, userAsk, skillType, labels[skillType], topicSource);
             }
             else if (issuesEvent.Action == IssuesAction.Closed && issuesEvent.Issue?.User.Type.Value == UserType.Bot)
             {
-                _logger.LogInformation("Processing HandleClosingIssue");
-                await HandleClosingIssue(issueNumber, skillName, labels[skillName], suffix);
+                await HandleAskApproval(userName, userAsk, skillType, labels[skillType], topicSource);
             }
         }
         catch (Exception ex)
@@ -83,25 +96,52 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
 
         try
         {
-            _logger.LogInformation("Processing issue comment event");
             var org = issueCommentEvent.Repository!.Owner.Login;
             var repo = issueCommentEvent.Repository.Name;
             var issueNumber = issueCommentEvent.Issue.Number;
-            var input = issueCommentEvent.Comment.Body;
+            var userName = issueCommentEvent.Issue.User.Name;
+            var userComment = issueCommentEvent.Comment.Body;
+
+            _logger.LogInformation($"{userName ?? "Somebody"} commented on {org}-{repo}-{issueNumber} with Labels: {string.Join(",", issueCommentEvent.Issue.Labels.Select(l => l.Name))}");
+
+            // We skip processing if the comment is from a bot because
+            // the bot creates comments to converse with the user
+            if (issueCommentEvent.Sender!.Type.Value == UserType.Bot)
+            {
+                _logger.LogInformation("Bot comment. Skip processing");
+                return;
+            }
+
             // Assumes the label follows the following convention: Skill.Function example: PM.Readme
             var labels = issueCommentEvent.Issue.Labels
                                     .Select(l => l.Name.Split('.'))
                                     .Where(parts => parts.Length == 2)
                                     .ToDictionary(parts => parts[0], parts => parts[1]);
-            var skillName = labels.Keys.First(k => k != "Parent");
-            long? parentNumber = labels.TryGetValue("Parent", out var value) ? long.Parse(value, CultureInfo.InvariantCulture) : null;
-            var suffix = $"{org}-{repo}";
-
-            // we only respond to non-bot comments
-            if (issueCommentEvent.Sender!.Type.Value != UserType.Bot)
+            if (labels == null || labels.Count == 0)
             {
-                await HandleNewAsk(issueNumber, skillName, labels[skillName], suffix, input, org, repo);
+                _logger.LogWarning("No labels found in issue. Skip processing.");
+                return;
             }
+
+            // Use the first label with a Skill.Function format
+            var skillType = labels.Keys.Where(k => k != "Parent").FirstOrDefault();
+            if (skillType == null)
+            {
+                _logger.LogWarning("No skill type found in issue. Skip processing.");
+                return;
+            }
+
+            // Create a unique topic source which when combined
+            // with a topic type based on the skillType
+            // results in a unique agent instance
+            var topicSource = $"Org.{org}-Repo.{repo}-IssueNumber.{issueNumber.ToString()}";
+            long? parentIssueNumber = labels.TryGetValue("Parent", out var value) ? long.Parse(value, CultureInfo.InvariantCulture) : null;
+            if (parentIssueNumber != null)
+            {
+                topicSource += $"-ParentIssueNumber.{parentIssueNumber.ToString()}";
+            }
+
+            await HandleNewAsk(userName, userComment, skillType, labels[skillType], topicSource);
         }
         catch (Exception ex)
         {
@@ -111,37 +151,45 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
 
     }
 
-    private async Task HandleClosingIssue(long issueNumber, string skillName, string functionName, string suffix)
+    private async Task HandleAskApproval(string? userName, string userMessage, string skillType, string skill, string topicSource)
     {
-        var subject = suffix + issueNumber.ToString();
+        _logger.LogInformation("Processing HandleAskApproval");
 
-        IMessage evt = (skillName, functionName) switch
+        IMessage askApprovalMessage = (skillType, skill) switch
         {
-            ("PM", "Readme") => new ReadmeChainClosed { },
-            ("DevLead", "Plan") => new DevPlanChainClosed { },
-            ("Developer", "Implement") => new CodeChainClosed { },
+            (SkillType.ProductOwner, nameof(PMSkills.Readme)) => new ReadmeIssueClosed { UserName = userName, UserMessage = userMessage },
+            (SkillType.DeveloperLead, nameof(DeveloperLeadSkills.Plan)) => new DevPlanIssueClosed { UserName = userName, UserMessage = userMessage },
+            (SkillType.Developer, nameof(DeveloperSkills.Implement)) => new CodeIssueClosed { UserName = userName, UserMessage = userMessage },
             _ => new CloudEvent() // TODO: default event
+            // There is a bug in the agent message flow
+            // Create a new issue explaining which skillName and functionName are not handled
+            // Who/What handles a generic CloudEvent?
+            // Can the CloudEvent be used to create a new issue?
         };
 
-        await _client.PublishMessageAsync(evt, new TopicId(Consts.TopicName), subject);
+        await _agentRuntime.PublishMessageAsync(askApprovalMessage, new TopicId(skillType, topicSource));
     }
 
-    private async Task HandleNewAsk(long issueNumber, string skillName, string functionName, string suffix, string input, string org, string repo)
+    private async Task HandleNewAsk(string? userName, string userMessage, string skillName, string functionName, string topicSource)
     {
         try
         {
             _logger.LogInformation("Handling new ask");
-            var subject = suffix + issueNumber.ToString();
 
-            IMessage evt = (skillName, functionName) switch
+            IMessage newAskMessage = (skillName, functionName) switch
             {
-                ("Do", "It") => new NewAsk { Ask = input, IssueNumber = issueNumber, Org = org, Repo = repo },
-                ("PM", "Readme") => new ReadmeRequested { Ask = input, IssueNumber = issueNumber, Org = org, Repo = repo },
-                ("DevLead", "Plan") => new DevPlanRequested { Ask = input, IssueNumber = issueNumber, Org = org, Repo = repo },
-                ("Developer", "Implement") => new CodeGenerationRequested { Ask = input, IssueNumber = issueNumber, Org = org, Repo = repo },
+                (SkillType.StakeHolder, nameof(StakeHolderSkills.Ask)) => new NewAsk { UserName = userName, UserMessage = userMessage },
+                (SkillType.ProductOwner, nameof(PMSkills.Readme)) => new ReadmeRequested { UserName = userName, UserMessage = userMessage },
+                (SkillType.DeveloperLead, nameof(DeveloperLeadSkills.Plan)) => new DevPlanRequested { UserName = userName, UserMessage = userMessage },
+                (SkillType.Developer, nameof(DeveloperSkills.Implement)) => new CodeGenerationRequested {UserName = userName, UserMessage = userMessage },
                 _ => new CloudEvent()
+                // If the issue already exists and we are responding to a comment
+                // Reply with comment listing the available skill types and corresponding skills
             };
-            await _client.PublishMessageAsync(evt, new TopicId(Consts.TopicName), subject);
+
+            // skill type is used as the typic type
+            // Agent implementations subscribe to their corresponding topic type
+            await _agentRuntime.PublishMessageAsync(newAskMessage, new TopicId(skillName, topicSource));
         }
         catch (Exception ex)
         {
