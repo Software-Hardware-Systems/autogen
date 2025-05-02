@@ -24,6 +24,9 @@
 
     <!-- Add gRPC dependencies for hosting gRPC services. -->
     <PackageReference Include="Grpc.AspNetCore" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>
 
   <ItemGroup>

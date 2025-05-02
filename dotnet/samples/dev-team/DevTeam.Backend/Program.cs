@@ -20,18 +20,21 @@ using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.Options;
 using Octokit.Webhooks;
 using Octokit.Webhooks.AspNetCore;
+using Serilog;
 
 // Configure the web application builder.
 var webAppBuilder = WebApplication.CreateBuilder(args);
 
-// Add user secrets for secure storage of sensitive information.
-webAppBuilder.Configuration.AddUserSecrets<Program>();
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console() // Log to console
+    .WriteTo.File("logs/backend-log-.txt", rollingInterval: RollingInterval.Day) // Log to file
+    .Enrich.FromLogContext()
+    .CreateLogger();
+webAppBuilder.Host.UseSerilog(); // Use Serilog as the logging provider// Configure logging to use console, debug, and configuration-based settings.
 
-// Configure logging to use console, debug, and configuration-based settings.
 webAppBuilder.Logging.ClearProviders();
-webAppBuilder.Logging.AddConsole();
-webAppBuilder.Logging.AddDebug();
-webAppBuilder.Logging.AddConfiguration(webAppBuilder.Configuration.GetSection("Logging"));
+webAppBuilder.Logging.AddSerilog();
 
 webAppBuilder.WebHost.ConfigureKestrel(options =>
 {

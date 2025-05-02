@@ -3,8 +3,16 @@
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Serilog;
 
 var distributedAppBuilder = DistributedApplication.CreateBuilder(args);
+
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console() // Log to console
+    .WriteTo.File("logs/apphost-log-.txt", rollingInterval: RollingInterval.Day) // Log to file
+    .Enrich.FromLogContext()
+    .CreateLogger();
 
 // Add user secrets
 distributedAppBuilder.Configuration.AddUserSecrets<Program>();
