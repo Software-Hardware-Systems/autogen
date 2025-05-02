@@ -22,6 +22,8 @@ using Octokit.Webhooks;
 using Octokit.Webhooks.AspNetCore;
 using Serilog;
 
+using DevTeamServiceDefaults = Microsoft.Extensions.Hosting.Extensions;
+
 // Configure the web application builder.
 var webAppBuilder = WebApplication.CreateBuilder(args);
 
@@ -63,7 +65,8 @@ webAppBuilder.WebHost.ConfigureKestrel(options =>
     //});
 });
 
-webAppBuilder.AddServiceDefaults();
+// The using alias points to the DevTeam.ServiceDefaults implementation of AddServiceDefaults
+DevTeamServiceDefaults.AddServiceDefaults(webAppBuilder);
 
 // Azure.AI is used for chat completion services
 webAppBuilder.AddChatCompletionService("AIClientOptions");
