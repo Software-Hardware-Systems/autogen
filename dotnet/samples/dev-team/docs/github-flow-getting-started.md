@@ -1,19 +1,195 @@
+# AIDevTeam: Getting Started
+
+This document provides a step-by-step guide to configure and run a distributed artificial intelligence application. Namely a collection of AI Agents designed to collaborate with their human counterparts in the field of software development.
+
+The example is intended for experienced developers who may not be familiar with all the infrastructure components used in this project, such as Aspire .NET distributed applications, ASP.NET Core, vector databases, Docker containers, and AI-driven workflows. Each configuration item is explained with its purpose and how it integrates into the application.
+
+---
+
 ## Prerequisites
 
-Forward leaning preview infrastructure is used in this sample.
+Before starting, ensure you have the following:
 
-- [Chat Completion/Inference/Encoding](#Chat-Completion/Inference-Endpoint-and-API-keys)
-- [Github App and Repositories](#how-do-i-setup-the-github-app)
-- [Azure Resources](#how-do-I-deploy-the-azure-bits)
+1. **GitHub Repository**:
+   - Permissions to create and install a GitHub App.
+   - Permissions to create labels in the repository.
 
-- GitHub repository where you have permissions to
-  1. Create and install a GitHub App
-  2. Create labels
+2. **Azure Account**:
+   - Permissions to create resources:
+     - Azure OpenAI resource.
+     - Azure Container Apps resource.
+     - Azure Storage Account.
 
-- Azure account with permissions to create resources
-  1. Azure OpenAI resource
-  2. Azure Container Apps resource
-  3. Azure Storage Account
+3. **Development Environment**:
+   - [.NET 8 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/8.0), or later, installed.
+   - Docker installed and running for containerized components.
+   - Access to a terminal or IDE with support for `.NET` development (e.g., Visual Studio 2022, Visual Studio Code, ...).
+
+4. **Azure AI Services**:
+   - An Azure AI resource for AI-driven workflows.
+   - [Sign up for Azure](https://azure.microsoft.com/en-us/free/) and create an [OpenAI resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAi).
+
+---
+
+## Application Overview
+
+This application demonstrates how AI agents can assist in software development tasks by integrating with GitHub and Azure.
+1. It uses Aspire for distributed application hosting
+2. AutoGen for agent communication
+3. Qdrant as a vector database for knowledge storage
+4. The GitHub App facilitates interaction with repository events
+5. Azure resources provide the infrastructure for hosting and running the agents
+
+---
+
+## Configuration Steps
+
+### 1. **GitHub App Setup**
+
+The GitHub App is central to the workflow, enabling interaction with repository events like issues and comments.
+
+- **Why Needed**: GitHub serves as the user interface for the distributed application.
+- **How Used**:  The app listens to GitHub events (e.g., issue creation/closed and comments) which then trigger AIDevTeam workflows.
+
+#### Steps:
+1. [Register a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app):
+   - Name: Choose a descriptive name.
+   - Homepage URL: Use your repository URL.
+   - Webhook URL: Add a placeholder (e.g., `https://example.com/api/github/webhooks`).
+   - Webhook Secret: Set a secret value for secure communication.
+   - Permissions:
+     - Repository:
+       - Contents: Read/Write.
+       - Issues: Read/Write.
+       - Metadata: Read-only.
+       - Pull requests: Read/Write.
+     - Subscribe to events:
+       - Issues.
+       - Issue comments.
+   - Allow installation by any user or organization.
+
+2. [Install the GitHub App](https://docs.github.com/en/apps/using-github-apps/installing-your-own-github-app) in the repository where you want to collaborate with the AIDevTeam.
+
+3. Generate a private key for the app and save it securely.
+
+4. Create the following labels in your repository:
+   - `PM.Readme`: For README generation tasks.
+   - `Do.It`: For general tasks.
+   - `DevLead.Plan`: For development planning.
+   - `Developer.Implement`: For implementation tasks.
+
+---
+
+### 2. **Azure Configuration**
+
+Azure resources provide infrastructure used to implement the AIDevTeam agents themselves as well as being used by the AIAgents as they participate in workflows.
+
+- **Why Needed**: Azure OpenAI powers the AI agents, while Azure Storage and Container Apps host and manage the application.
+- **How Used**: The application uses Azure credentials to authenticate and interact with these resources.
+
+#### Steps:
+1. [Create an Azure OpenAI resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAi).
+2. [Create an Azure Storage Account](https://learn.microsoft.com/en-us/azure/storage/common/storage-account-overview).
+3. [Deploy Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/overview).
+
+---
+
+### 3. **Local Development Setup**
+
+The application can be run locally for development and testing.
+
+- **Why Needed**: Local setup allows you to test the application before deploying it to Azure.
+- **How Used**: The application uses local configuration files and tools like DevTunnels or ngrok to expose endpoints.
+
+#### Steps:
+1. Clone the repository and open it in your IDE.
+2. Reference the `appsettings.local.template.json` and create dotnet user-secrets for each value:
+   - **GitHubOptions**:
+     - `AppKey`: The private key from the GitHub App.
+     - `AppId`: The GitHub App ID.
+     - `InstallationId`: The installation ID of the app.
+     - `WebhookSecret`: The webhook secret.
+   - **AzureOptions**:
+     - `SubscriptionId`: Your Azure subscription ID.
+     - `Location`: Azure region for resources.
+     - `ContainerInstancesResourceGroup`: Resource group for container instances.
+     - `FilesAccountName`: Azure Storage Account name.
+     - `FilesShareName`: File share name.
+     - `FilesAccountKey`: Storage account key.
+     - `SandboxImage`: Docker image for sandbox runs.
+
+3. Expose the application to GitHub webhooks using [DevTunnels](https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/overview) or ngrok:
+   ```bash
+   TUNNEL_NAME=_name_your_tunnel_here_
+   devtunnel user login
+   devtunnel create -a $TUNNEL_NAME
+   devtunnel port create -p 5244 $TUNNEL_NAME
+   devtunnel host $TUNNEL_NAME
+   ```
+   Update the GitHub App's webhook URL with the tunnel address (e.g., `https://your_tunnel_name.euw.devtunnels.ms/api/github/webhooks`).
+
+4. Run the application:
+   ```bash
+   dotnet run
+   ```
+
+---
+
+### 4. **Qdrant Vector Database**
+
+Qdrant is used for storing and retrieving vectorized knowledge.
+
+- **Why Needed**: AI agents use Qdrant to store and query embeddings for tasks like semantic search.
+- **How Used**: The application connects to Qdrant using its endpoint and API key.
+
+#### Steps:
+1. [Learn about Qdrant](https://qdrant.tech/documentation/overview/).
+2. Fill in the Qdrant configuration in `appsettings.json`:
+   - `Qdrant__Endpoint`: Qdrant endpoint URL.
+   - `Qdrant__ApiKey`: API key for authentication.
+   - `Qdrant__VectorSize`: Size of the vector embeddings.
+
+3. Seed the database with initial data:
+   ```bash
+   dotnet run --project samples/seed-memory
+   ```
+
+---
+
+### 5. **Running in Azure**
+
+Deploy the application to Azure for production use.
+
+- **Why Needed**: Azure provides scalability and reliability for hosting the application.
+- **How Used**: The application uses Azure Developer CLI (`azd`) for deployment.
+
+#### Steps:
+1. Install the [Azure Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/overview).
+2. Log in to Azure:
+   ```bash
+   azd auth login
+   ```
+3. Create a new environment and provision resources:
+   ```bash
+   ENVIRONMENT=_name_of_your_env_
+   azd env new $ENVIRONMENT
+   azd provision -e $ENVIRONMENT
+   ```
+4. Retrieve the environment values:
+   ```bash
+   azd env get-values -e $ENVIRONMENT
+   ```
+
+---
+
+## Additional Notes
+
+- **Orleans Dashboard**: Access metrics and stats for the running agents at `/dashboard` (e.g., `https://your_tunnel_name.euw.devtunnels.ms/dashboard`).
+- **OpenTelemetry**: The application uses OpenTelemetry for distributed tracing and metrics. Learn more [here](https://opentelemetry.io/docs/concepts/).
+
+By following these steps, you can configure and run the application locally or in Azure. For further details, refer to the linked documentation for each component.
+
+
 
 ### Expanded Workflow
 
