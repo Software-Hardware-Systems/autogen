@@ -27,8 +27,7 @@ distributedAppBuilder.Configuration.AddUserSecrets<Program>();
 // We use Grpc Hosting infrastructure so we can involve agents defined in Python land
 IResourceBuilder<ContainerResource> autoGenAgentHostContainer;
 EndpointReference agentHostHttpsEndpoint;
-EndpointReference agentHostHttpEndpoint;
-//EndpointReference agentHostHttpsWebHookEndpoint;
+//EndpointReference agentHostHttpEndpoint;
 
 // if we are using an external Grpc host, then environment variable AGENT_HOST will already be defined
 if (Environment.GetEnvironmentVariable("AGENT_HOST") != null)
@@ -39,26 +38,24 @@ if (Environment.GetEnvironmentVariable("AGENT_HOST") != null)
 else
 {
     int agentHostHttpsPort = 5001; // The port used by the agent host
-    int agentHostHttpPort = 5000; // The port used by the agent host
-    //int githubWebhookPort = 5244; // The port used for GitHub webhook
+    //int agentHostHttpPort = 5000; // The port used by the agent host
 
     // The AutoGen agent host, managing inter agent Grpc communication, is running in a container
     autoGenAgentHostContainer = distributedAppBuilder
         .AddContainer(name: "agent-host", image: "autogen-host") // You can build the image in Microsoft.Autogen.AgentHost or use the autogen-host image from Docker Hub
-        .WithEnvironment("ASPNETCORE_URLS", string.Concat("https://+:", agentHostHttpsPort, ";http://+", agentHostHttpPort))
+        .WithEnvironment("ASPNETCORE_URLS", "https://+;http://+")
+        .WithEnvironment("ASPNETCORE_HTTPS_PORTS", agentHostHttpsPort.ToString())
         .WithEnvironment("ASPNETCORE_Kestrel__Certificates__Default__Password", distributedAppBuilder.Configuration["DevCert:Password"])
         .WithEnvironment("ASPNETCORE_Kestrel__Certificates__Default__Path", "/https/devcert.pfx")
         .WithEnvironment("ASPNETCORE_ENVIRONMENT", environment)
         .WithBindMount(distributedAppBuilder.Configuration["DevCert:Path"] ?? "./certs", "/https", true)
         .WithHttpsEndpoint(port: agentHostHttpsPort, targetPort: agentHostHttpsPort, name: "agent-host-https-endpoint")
-        .WithHttpEndpoint(port: agentHostHttpPort, targetPort: agentHostHttpPort, name: "agent-host-http-endpoint")
-        //.WithHttpsEndpoint(port: githubWebhookPort, targetPort: githubWebhookPort, name: "githubapp-webhook")
+        //.WithHttpEndpoint(port: agentHostHttpPort, targetPort: agentHostHttpPort, name: "agent-host-http-endpoint")
         ?? throw new Exception("Failed to create autoGenAgentHost");
     // The agent host is running in a container
     // Get the https endpoint so we can pass it to the backend
     agentHostHttpsEndpoint = autoGenAgentHostContainer.GetEndpoint("agent-host-https-endpoint");
-    agentHostHttpEndpoint = autoGenAgentHostContainer.GetEndpoint("agent-host-http-endpoint");
-    //agentHostHttpsWebHookEndpoint = autoGenAgentHostContainer.GetEndpoint("githubapp-webhook");
+    //agentHostHttpEndpoint = autoGenAgentHostContainer.GetEndpoint("agent-host-http-endpoint");
 }
 
 // Log the agentHostEndpoint
@@ -72,8 +69,8 @@ var qdrant = distributedAppBuilder.AddQdrant("qdrant");
 var dotnet = distributedAppBuilder.AddProject<Projects.DevTeam_Backend>("backend")
     // Pass in the agent host endpoint and initialize the AGENT_HOST environment variable
     .WithReference(agentHostHttpsEndpoint)
-    .WithReference(agentHostHttpEndpoint)
-    .WithEnvironment("AGENT_HOST", agentHostHttpsEndpoint)
+    //.WithReference(agentHostHttpEndpoint)
+    .WithEnvironment("AGENT_HOST", $"{agentHostHttpsEndpoint.Property(EndpointProperty.Url)}")
     // The DevTeam Backend project uses the Qdrant vector database for knowledge stores
     .WithEnvironment("Qdrant__Endpoint", $"{qdrant.Resource.HttpEndpoint.Property(EndpointProperty.Url)}")
     .WithEnvironment("Qdrant__ApiKey", $"{qdrant.Resource.ApiKeyParameter.Value}")
@@ -87,7 +84,8 @@ var dotnet = distributedAppBuilder.AddProject<Projects.DevTeam_Backend>("backend
     .WithEnvironment("Github__WebhookSecret", distributedAppBuilder.Configuration["Github:WebhookSecret"])
     .WithEnvironment("Github__AppKey", distributedAppBuilder.Configuration["Github:AppKey"])
     //.WithReference(agentHostHttpsWebHookEndpoint)
-    .WithHttpsEndpoint(port: 5244, targetPort: 5244, isProxied: false, name: "githubapp-webhook")
+    //.WithHttpsEndpoint(port: 5244, targetPort: 5244, isProxied: false, name: "githubapp-webhook")
+    .WithHttpEndpoint(port: 5244, targetPort: 5244, isProxied: false, name: "githubapp-webhook")
     // External endpoints are used to communicate with the GithubApp webhook
     //.WithExternalHttpEndpoints()
     .WaitFor(autoGenAgentHostContainer)

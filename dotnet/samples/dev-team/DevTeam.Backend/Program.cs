@@ -11,11 +11,9 @@ using DevTeam.Backend.Agents.DeveloperLead;
 using DevTeam.Backend.Agents.ProductManager;
 using DevTeam.Backend.Services;
 using DevTeam.Options;
-using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
 using Microsoft.AutoGen.Core.Grpc;
 using Microsoft.AutoGen.Extensions.SemanticKernel;
-using Microsoft.AutoGen.Protobuf;
 using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.Options;
 using Octokit.Webhooks;
@@ -38,6 +36,9 @@ webAppBuilder.Host.UseSerilog(); // Use Serilog as the logging provider// Config
 webAppBuilder.Logging.ClearProviders();
 webAppBuilder.Logging.AddSerilog();
 
+// Add user secrets for secure storage of sensitive information.
+webAppBuilder.Configuration.AddUserSecrets<Program>();
+
 webAppBuilder.WebHost.ConfigureKestrel(options =>
 {
     options.ConfigureHttpsDefaults(httpsOptions =>
@@ -57,12 +58,6 @@ webAppBuilder.WebHost.ConfigureKestrel(options =>
             throw new InvalidOperationException("Certificate path or password is not configured.");
         }
     });
-
-    // Ensure Kestrel listens on the required ports
-    //options.ListenLocalhost(5244, listenOptions =>
-    //{
-    //    listenOptions.UseHttps();
-    //});
 });
 
 // The using alias points to the DevTeam.ServiceDefaults implementation of AddServiceDefaults
@@ -71,27 +66,11 @@ DevTeamServiceDefaults.AddServiceDefaults(webAppBuilder);
 // Azure.AI is used for chat completion services
 webAppBuilder.AddChatCompletionService("AIClientOptions");
 
-// Semantic Kernel is used for VectorMemory for knowledge documents
+// Semantic Kernel is used for storing knowledge documents into VectorMemory
 webAppBuilder.ConfigureSemanticKernel();
 
-// Add gRPC services and configure the gRPC client to connect to the Agent-Host.
+// gRPC AspNetCore support is used for AutoGen agent communication infrastructure
 webAppBuilder.Services.AddGrpc();
-webAppBuilder.Services.AddGrpcClient<AgentRpc.AgentRpcClient>(options =>
-{
-    // Ensure the AGENT_HOST configuration key is set to a valid URI.
-    var agentHost = webAppBuilder.Configuration["AGENT_HOST"];
-    if (string.IsNullOrEmpty(agentHost))
-    {
-        throw new InvalidOperationException("The AGENT_HOST configuration is missing or invalid.");
-    }
-
-    options.Address = new Uri(agentHost);
-});
-
-// Register the GrpcAgentRuntime, which manages the gRPC runtime for agents.
-webAppBuilder.Services.AddSingleton<GrpcAgentRuntime>();
-// Register the GrpcAgentRuntime as the implementation for IAgentRuntime.
-webAppBuilder.Services.AddSingleton<IAgentRuntime, GrpcAgentRuntime>();
 
 // Configure GitHub options and validate them on startup.
 webAppBuilder.Services.AddOptions<GithubOptions>()
@@ -109,14 +88,17 @@ webAppBuilder.Services.AddOptions<GithubOptions>()
         }
     });
 
+// The Github client is transient and used for interacting with GitHub APIs.
 webAppBuilder.Services.AddTransient(s =>
 {
     var ghOptions = s.GetRequiredService<IOptions<GithubOptions>>();
     var logger = s.GetRequiredService<ILogger<GithubAuthService>>();
     var ghService = new GithubAuthService(ghOptions, logger);
-    var client = ghService.GetGitHubClient();
-    return client;
+    var githubClient = ghService.GetGitHubClient();
+    return githubClient;
 });
+// The GithubService is a singleton and used by the agents to perform operations like creating issues, branches, and pull requests.
+webAppBuilder.Services.AddSingleton<IManageGithub, GithubService>();
 
 // Configure Azure clients for interacting with Azure resources.
 webAppBuilder.Services.AddAzureClients(clientBuilder =>
@@ -124,14 +106,11 @@ webAppBuilder.Services.AddAzureClients(clientBuilder =>
     clientBuilder.AddArmClient(default);
     clientBuilder.UseCredential(new DefaultAzureCredential());
 });
-
-// Register other application services.
-webAppBuilder.Services.AddSingleton<WebhookEventProcessor, GithubWebHookProcessor>();
-webAppBuilder.Services.AddSingleton<IManageGithub, GithubService>();
+// The AzureService is a singleton and used by the agents to perform operations like storing code or documents in Azure Blob Storage and running code in a sandbox environment.
 webAppBuilder.Services.AddSingleton<IManageAzure, AzureService>();
 
-// Build the application.
-var app = webAppBuilder.Build();
+// The WebhookEventProcessor listens for GitHub webhook events and publishes messages to DevTeam agents.
+webAppBuilder.Services.AddSingleton<WebhookEventProcessor, GithubWebHookProcessor>();
 
 // Configure the AgentsAppBuilder to register agents with the gRPC Agent-Host.
 // This demonstrates how to register multiple agents for the sample application.
@@ -144,14 +123,17 @@ agentsAppBuilder.AddGrpcAgentWorker(webAppBuilder.Configuration["AGENT_HOST"]!)
     .AddAgent<ProductManager>(nameof(ProductManager))
     .AddAgent<DeveloperLead>(nameof(DeveloperLead));
 
-// Map default endpoints for the application.
-AspireHostingExtensions.MapDefaultEndpoints(app);
+var agentsApp = await agentsAppBuilder.BuildAsync();
+await agentsApp.StartAsync();
+
+// Build the application.
+var webApp = webAppBuilder.Build();
 
 // Configure routing and endpoints for GitHub webhooks and gRPC services.
-app.UseRouting()
+webApp.UseRouting()
    .UseEndpoints(endpoints =>
    {
-       var ghOptions = app.Services.GetRequiredService<IOptions<GithubOptions>>().Value;
+       var ghOptions = webApp.Services.GetRequiredService<IOptions<GithubOptions>>().Value;
        endpoints.MapGitHubWebhooks(secret: ghOptions.WebhookSecret);
 
        // Map the gRPC service to handle gRPC requests.
@@ -166,4 +148,4 @@ app.UseRouting()
 //});
 
 // Run the application.
-app.Run();
+webApp.Run();
