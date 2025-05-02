@@ -6,7 +6,7 @@ namespace DevTeam.Backend;
 public class SkillType
 {
     public const string DevTeam = "DevTeam";
-    public const string StakeHolder = "StakeHolder";
+    public const string Stakeholder = "Stakeholder";
     public const string ProductOwner = "ProductOwner";
     public const string DeveloperLead = "DevLead";
     public const string Developer = "Dev";
@@ -15,7 +15,7 @@ public class SkillType
     public const string Sandbox = "Sandbox";
 }
 
-public class StakeHolderSkills
+public class StakeholderSkills
 {
     public const string Ask = "Ask";
 }
