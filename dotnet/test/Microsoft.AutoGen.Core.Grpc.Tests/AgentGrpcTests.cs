@@ -21,14 +21,14 @@ public class AgentGrpcTests : TestBase
         Logger<BaseAgent> logger = new(new LoggerFactory());
         TestProtobufAgent agent = null!;
 
-        await runtime.RegisterAgentFactoryAsync("MyAgent", async (id, runtime) =>
+        await runtime.RegisterAgentFactoryAsync("MyAgent1", async (id, runtime) =>
         {
             agent = new TestProtobufAgent(id, runtime, logger);
             return await ValueTask.FromResult(agent);
         });
 
         // Ensure the agent is actually created
-        AgentId agentId = await runtime.GetAgentAsync("MyAgent", lazy: false);
+        AgentId agentId = await runtime.GetAgentAsync("MyAgent1", lazy: false);
 
         // Validate agent ID
         agentId.Should().Be(agent.Id, "Agent ID should match the registered agent");
@@ -50,19 +50,19 @@ public class AgentGrpcTests : TestBase
         Logger<BaseAgent> logger = new(new LoggerFactory());
         SubscribedProtobufAgent agent = null!;
 
-        await runtime.RegisterAgentFactoryAsync("MyAgent", async (id, runtime) =>
+        await runtime.RegisterAgentFactoryAsync("MyAgent2", async (id, runtime) =>
         {
             agent = new SubscribedProtobufAgent(id, runtime, logger);
             return await ValueTask.FromResult(agent);
         });
 
         // Ensure the agent is actually created
-        AgentId agentId = await runtime.GetAgentAsync("MyAgent", lazy: false);
+        AgentId agentId = await runtime.GetAgentAsync("MyAgent2", lazy: false);
 
         // Validate agent ID
         agentId.Should().Be(agent.Id, "Agent ID should match the registered agent");
 
-        await runtime.RegisterImplicitAgentSubscriptionsAsync<SubscribedProtobufAgent>("MyAgent");
+        await runtime.RegisterImplicitAgentSubscriptionsAsync<SubscribedProtobufAgent>("MyAgent2");
 
         var topicType = "TestTopic";
 
@@ -83,8 +83,8 @@ public class AgentGrpcTests : TestBase
         var runtime = (GrpcAgentRuntime)await fixture.StartAsync();
 
         Logger<BaseAgent> logger = new(new LoggerFactory());
-        await runtime.RegisterAgentFactoryAsync("MyAgent", async (id, runtime) => await ValueTask.FromResult(new TestProtobufAgent(id, runtime, logger)));
-        var agentId = new AgentId("MyAgent", "default");
+        await runtime.RegisterAgentFactoryAsync("MyAgent4", async (id, runtime) => await ValueTask.FromResult(new TestProtobufAgent(id, runtime, logger)));
+        var agentId = new AgentId("MyAgent4", "default");
         var response = await runtime.SendMessageAsync(new RpcTextMessage { Source = "TestTopic", Content = "Request" }, agentId);
 
         // Assert
@@ -116,14 +116,14 @@ public class AgentGrpcTests : TestBase
         var fixture = new GrpcAgentRuntimeFixture();
         var runtime = (GrpcAgentRuntime)await fixture.StartAsync();
         ReceiverAgent? agent = null;
-        await runtime.RegisterAgentFactoryAsync("MyAgent", async (id, runtime) =>
+        await runtime.RegisterAgentFactoryAsync("MyAgent5", async (id, runtime) =>
         {
             agent = new ReceiverAgent(id, runtime);
             return await ValueTask.FromResult(agent);
         });
 
         Assert.Null(agent);
-        await runtime.GetAgentAsync("MyAgent", lazy: false);
+        await runtime.GetAgentAsync("MyAgent5", lazy: false);
         Assert.NotNull(agent);
         Assert.True(agent.ReceivedItems.Count == 0);
 
@@ -133,7 +133,7 @@ public class AgentGrpcTests : TestBase
 
         Assert.True(agent.ReceivedItems.Count == 0);
 
-        var subscription = new TypeSubscription(topicTypeName, "MyAgent");
+        var subscription = new TypeSubscription(topicTypeName, "MyAgent5");
         await runtime.AddSubscriptionAsync(subscription);
 
         await runtime.PublishMessageAsync(new TextMessage { Source = "topic", Content = "test" }, new TopicId(topicTypeName));

@@ -2,6 +2,7 @@
 // Program.cs
 
 //using System.Security.Cryptography.X509Certificates;
+using System.Diagnostics;
 using System.Security.Cryptography.X509Certificates;
 using Azure.Identity;
 using DevTeam.Backend;
@@ -11,6 +12,8 @@ using DevTeam.Backend.Agents.DeveloperLead;
 using DevTeam.Backend.Agents.ProductManager;
 using DevTeam.Backend.Services;
 using DevTeam.Options;
+using Microsoft.AspNetCore.Server.Kestrel.Https;
+using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
 using Microsoft.AutoGen.Core.Grpc;
 using Microsoft.AutoGen.Extensions.SemanticKernel;
@@ -39,7 +42,8 @@ webAppBuilder.Logging.AddSerilog();
 // Add user secrets for secure storage of sensitive information.
 webAppBuilder.Configuration.AddUserSecrets<Program>();
 
-webAppBuilder.WebHost.ConfigureKestrel(options =>
+X509Certificate2? webAppServerCertificate = null;
+var kestrel = webAppBuilder.WebHost.ConfigureKestrel(options =>
 {
     options.ConfigureHttpsDefaults(httpsOptions =>
     {
@@ -47,16 +51,21 @@ webAppBuilder.WebHost.ConfigureKestrel(options =>
             | System.Security.Authentication.SslProtocols.Tls13;
 
         // Load the certificate from configuration
-        var certPath = webAppBuilder.Configuration["DevCert:Path"];
-        var certPassword = webAppBuilder.Configuration["DevCert:Password"];
-        if (!string.IsNullOrEmpty(certPath) && !string.IsNullOrEmpty(certPassword))
+        var webAppServerCertPath = webAppBuilder.Configuration["WebAppServerCert:Path"];
+        var webAppServerCertPassword = webAppBuilder.Configuration["WebAppServerCert:Password"];
+        if (!string.IsNullOrEmpty(webAppServerCertPath) && !string.IsNullOrEmpty(webAppServerCertPassword))
         {
-            httpsOptions.ServerCertificate = new X509Certificate2(certPath, certPassword);
+            webAppServerCertificate = new X509Certificate2(webAppServerCertPath, webAppServerCertPassword);
+            httpsOptions.ServerCertificate = webAppServerCertificate;
         }
         else
         {
-            throw new InvalidOperationException("Certificate path or password is not configured.");
+            throw new InvalidOperationException("WebApp server certificate path or password is not configured.");
         }
+
+        // Require client certificates
+        httpsOptions.ClientCertificateMode = ClientCertificateMode.RequireCertificate;
+        httpsOptions.CheckCertificateRevocation = Debugger.IsAttached ? false : true;
     });
 });
 
@@ -71,6 +80,29 @@ webAppBuilder.ConfigureSemanticKernel();
 
 // gRPC AspNetCore support is used for AutoGen agent communication infrastructure
 webAppBuilder.Services.AddGrpc();
+
+// Configure the AgentsAppBuilder to register agents with the gRPC Agent-Host.
+// This demonstrates how to register multiple agents for the sample application.
+AgentsAppBuilder agentsAppBuilder = new AgentsAppBuilder();
+agentsAppBuilder.Configuration["AGENT_HOST"] = webAppBuilder.Configuration["AGENT_HOST"];
+agentsAppBuilder.Configuration["AgentHostCert:Path"] = webAppBuilder.Configuration["AgentHostCert:Path"];
+agentsAppBuilder.Configuration["AgentHostCert:Password"] = webAppBuilder.Configuration["AgentHostCert:Password"];
+agentsAppBuilder.AddGrpcAgentWorker()
+    .AddAgent<AzureGenie>(nameof(AzureGenie))
+    .AddAgent<Sandbox>(nameof(Sandbox))
+    .AddAgent<Hubber>(nameof(Hubber))
+    .AddAgent<Dev>(nameof(Dev))
+    .AddAgent<ProductManager>(nameof(ProductManager))
+    .AddAgent<DeveloperLead>(nameof(DeveloperLead));
+
+var agentsApp = await agentsAppBuilder.BuildAsync();
+await agentsApp.StartAsync();
+
+var agentRuntime = agentsApp.Services.GetRequiredService<IAgentRuntime>();
+webAppBuilder.Services.AddSingleton(agentRuntime);
+
+// The WebhookEventProcessor listens for GitHub webhook events and publishes messages to DevTeam agents.
+webAppBuilder.Services.AddSingleton<WebhookEventProcessor, GithubWebHookProcessor>();
 
 // Configure GitHub options and validate them on startup.
 webAppBuilder.Services.AddOptions<GithubOptions>()
@@ -108,23 +140,6 @@ webAppBuilder.Services.AddAzureClients(clientBuilder =>
 });
 // The AzureService is a singleton and used by the agents to perform operations like storing code or documents in Azure Blob Storage and running code in a sandbox environment.
 webAppBuilder.Services.AddSingleton<IManageAzure, AzureService>();
-
-// The WebhookEventProcessor listens for GitHub webhook events and publishes messages to DevTeam agents.
-webAppBuilder.Services.AddSingleton<WebhookEventProcessor, GithubWebHookProcessor>();
-
-// Configure the AgentsAppBuilder to register agents with the gRPC Agent-Host.
-// This demonstrates how to register multiple agents for the sample application.
-AgentsAppBuilder agentsAppBuilder = new AgentsAppBuilder();
-agentsAppBuilder.AddGrpcAgentWorker(webAppBuilder.Configuration["AGENT_HOST"]!)
-    .AddAgent<AzureGenie>(nameof(AzureGenie))
-    .AddAgent<Sandbox>(nameof(Sandbox))
-    .AddAgent<Hubber>(nameof(Hubber))
-    .AddAgent<Dev>(nameof(Dev))
-    .AddAgent<ProductManager>(nameof(ProductManager))
-    .AddAgent<DeveloperLead>(nameof(DeveloperLead));
-
-var agentsApp = await agentsAppBuilder.BuildAsync();
-await agentsApp.StartAsync();
 
 // Build the application.
 var webApp = webAppBuilder.Build();

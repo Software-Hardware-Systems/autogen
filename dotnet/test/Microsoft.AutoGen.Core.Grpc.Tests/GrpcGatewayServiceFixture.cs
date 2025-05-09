@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// GrpcAgentServiceFixture.cs
+// GrpcGatewayServiceFixture.cs
 
 using Grpc.Core;
 using Microsoft.AutoGen.Protobuf;
@@ -24,10 +24,10 @@ public sealed class GrpcAgentServiceCollector
 /// <summary>
 /// This fixture is largely just a loopback as we are testing the client side logic of the GrpcAgentRuntime in isolation from the rest of the system.
 /// </summary>
-public class GrpcAgentServiceFixture : AgentRpc.AgentRpcBase
+public class GrpcGatewayServiceFixture : AgentRpc.AgentRpcBase
 {
     private GrpcAgentServiceCollector requestCollector;
-    public GrpcAgentServiceFixture(IServiceProvider serviceProvider)
+    public GrpcGatewayServiceFixture(IServiceProvider serviceProvider)
     {
         this.requestCollector = serviceProvider.GetService<GrpcAgentServiceCollector>() ?? new();
     }

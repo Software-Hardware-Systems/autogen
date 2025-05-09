@@ -31,6 +31,13 @@ public class AgentsAppBuilder
 
     public AgentsAppBuilder UseInProcessRuntime(bool deliverToSelf = false)
     {
+        var existingAgentRuntimeRegistration = builder.Services.FirstOrDefault(service => service.ServiceType == typeof(IAgentRuntime));
+        if (existingAgentRuntimeRegistration != null)
+        {
+            var existingAgentRuntimeType = existingAgentRuntimeRegistration.ImplementationType ?? existingAgentRuntimeRegistration.ImplementationFactory?.Method.ReturnType;
+            throw new InvalidOperationException($"Attempted to initialize {nameof(IAgentRuntime)} using {nameof(UseInProcessRuntime)} when it is already registered{(existingAgentRuntimeType?.Name == null ? "" : " as '" + existingAgentRuntimeType.Name) + "'"}.");
+        }
+
         this.Services.AddSingleton<IAgentRuntime, InProcessRuntime>(_ => new InProcessRuntime { DeliverToSelf = deliverToSelf });
         this.Services.AddHostedService<InProcessRuntime>(services =>
         {

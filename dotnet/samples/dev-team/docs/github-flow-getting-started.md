@@ -391,7 +391,7 @@ The loader is a project in the `samples` folder, called `seed-memory`. We need t
 ### WIP Local setup
 
 ```
-dotnet user-secrets set "DevCert:Password" "your_devcert_password"
+dotnet user-secrets set "ServerCert:Password" "your_devcert_password"
 
 
 

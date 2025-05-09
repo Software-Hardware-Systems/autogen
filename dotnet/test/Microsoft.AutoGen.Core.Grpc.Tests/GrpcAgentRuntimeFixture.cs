@@ -74,7 +74,7 @@ public sealed class GrpcAgentRuntimeFixture : IDisposable
         builder.Services.AddSingleton(this.GrpcRequestCollector);
 
         WebApplication app = builder.Build();
-        app.MapGrpcService<GrpcAgentServiceFixture>();
+        app.MapGrpcService<GrpcGatewayServiceFixture>();
 
         await app.StartAsync().ConfigureAwait(true);
         return app;

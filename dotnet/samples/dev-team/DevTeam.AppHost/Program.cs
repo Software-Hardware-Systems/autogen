@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Program.cs
 
+//using Aspire.Hosting.Python;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Serilog;
@@ -17,7 +18,7 @@ Log.Logger = new LoggerConfiguration()
 // Add user secrets
 distributedAppBuilder.Configuration.AddUserSecrets<Program>();
 
-    string environment;
+string environment;
 #if DEBUG
     environment = Environments.Development;
 #else
@@ -26,8 +27,8 @@ distributedAppBuilder.Configuration.AddUserSecrets<Program>();
 
 // We use Grpc Hosting infrastructure so we can involve agents defined in Python land
 IResourceBuilder<ContainerResource> autoGenAgentHostContainer;
-EndpointReference agentHostHttpsEndpoint;
-//EndpointReference agentHostHttpEndpoint;
+EndpointReference agentHostHttpsEndpointForDotnetBackend;
+EndpointReference agentHostHttpEndpointForXlang; // Python agent host endpoint
 
 // if we are using an external Grpc host, then environment variable AGENT_HOST will already be defined
 if (Environment.GetEnvironmentVariable("AGENT_HOST") != null)
@@ -37,40 +38,38 @@ if (Environment.GetEnvironmentVariable("AGENT_HOST") != null)
 }
 else
 {
-    int agentHostHttpsPort = 5001; // The port used by the agent host
-    //int agentHostHttpPort = 5000; // The port used by the agent host
+    int agentHostHttpsPort = 5001;
+    int agentHostHttpPort = 5000;
 
-    // The AutoGen agent host, managing inter agent Grpc communication, is running in a container
+    // The AutoGen agent host, managing agent message pub/sub, runs in docker
     autoGenAgentHostContainer = distributedAppBuilder
-        .AddContainer(name: "agent-host", image: "autogen-host") // You can build the image in Microsoft.Autogen.AgentHost or use the autogen-host image from Docker Hub
-        .WithEnvironment("ASPNETCORE_URLS", "https://+;http://+")
-        .WithEnvironment("ASPNETCORE_HTTPS_PORTS", agentHostHttpsPort.ToString())
-        .WithEnvironment("ASPNETCORE_Kestrel__Certificates__Default__Password", distributedAppBuilder.Configuration["DevCert:Password"])
-        .WithEnvironment("ASPNETCORE_Kestrel__Certificates__Default__Path", "/https/devcert.pfx")
+        .AddContainer(name: "agent-host", image: "autogen-host")
+        .WithEnvironment("ASPNETCORE_URLS", $"https://+:{agentHostHttpsPort.ToString()};http://+:{agentHostHttpPort.ToString()}")
+        .WithEnvironment("ASPNETCORE_Kestrel__Certificates__Default__Password", distributedAppBuilder.Configuration["AgentHostCert:Password"])
+        .WithEnvironment("ASPNETCORE_Kestrel__Certificates__Default__Path", "/https/AgentHostCert.pfx")
         .WithEnvironment("ASPNETCORE_ENVIRONMENT", environment)
-        .WithBindMount(distributedAppBuilder.Configuration["DevCert:Path"] ?? "./certs", "/https", true)
+        .WithBindMount(Path.GetDirectoryName(distributedAppBuilder.Configuration["AgentHostCert:Path"]) ?? "./certs", "/https", true)
         .WithHttpsEndpoint(port: agentHostHttpsPort, targetPort: agentHostHttpsPort, name: "agent-host-https-endpoint")
-        //.WithHttpEndpoint(port: agentHostHttpPort, targetPort: agentHostHttpPort, name: "agent-host-http-endpoint")
+        .WithHttpEndpoint(port: agentHostHttpPort, targetPort: agentHostHttpPort, name: "agent-host-http-endpoint")
         ?? throw new Exception("Failed to create autoGenAgentHost");
-    // The agent host is running in a container
-    // Get the https endpoint so we can pass it to the backend
-    agentHostHttpsEndpoint = autoGenAgentHostContainer.GetEndpoint("agent-host-https-endpoint");
-    //agentHostHttpEndpoint = autoGenAgentHostContainer.GetEndpoint("agent-host-http-endpoint");
-}
 
-// Log the agentHostEndpoint
-Console.WriteLine($"Agent Host Endpoint: {agentHostHttpsEndpoint}");
+    // The https endpoint will be used for the dotnet backend agents
+    agentHostHttpsEndpointForDotnetBackend = autoGenAgentHostContainer.GetEndpoint("agent-host-https-endpoint");
+    // The http endpoint will be used for the xlang (python) agents
+    agentHostHttpEndpointForXlang = autoGenAgentHostContainer.GetEndpoint("agent-host-http-endpoint");
+}
 
 // Vector Database used for knowledge stores
 var qdrant = distributedAppBuilder.AddQdrant("qdrant");
 
 // Add DevTeam Backend project defines the DevTeam AutoGen agents
 //var dotnetDevTeam =
-var dotnet = distributedAppBuilder.AddProject<Projects.DevTeam_Backend>("backend")
+var dotnetDevTeam = distributedAppBuilder.AddProject<Projects.DevTeam_Backend>("backend")
     // Pass in the agent host endpoint and initialize the AGENT_HOST environment variable
-    .WithReference(agentHostHttpsEndpoint)
-    //.WithReference(agentHostHttpEndpoint)
-    .WithEnvironment("AGENT_HOST", $"{agentHostHttpsEndpoint.Property(EndpointProperty.Url)}")
+    //.WithReference(agentHostHttpsEndpoint)
+    .WithEnvironment("AGENT_HOST", $"{agentHostHttpsEndpointForDotnetBackend.Property(EndpointProperty.Url)}")
+    .WithEnvironment("AgentHostCert__Path", distributedAppBuilder.Configuration["AgentHostCert:Path"])
+    .WithEnvironment("AgentHostCert__Password", distributedAppBuilder.Configuration["AgentHostCert:Password"])
     // The DevTeam Backend project uses the Qdrant vector database for knowledge stores
     .WithEnvironment("Qdrant__Endpoint", $"{qdrant.Resource.HttpEndpoint.Property(EndpointProperty.Url)}")
     .WithEnvironment("Qdrant__ApiKey", $"{qdrant.Resource.ApiKeyParameter.Value}")
@@ -83,21 +82,14 @@ var dotnet = distributedAppBuilder.AddProject<Projects.DevTeam_Backend>("backend
     .WithEnvironment("Github__InstallationId", distributedAppBuilder.Configuration["Github:InstallationId"])
     .WithEnvironment("Github__WebhookSecret", distributedAppBuilder.Configuration["Github:WebhookSecret"])
     .WithEnvironment("Github__AppKey", distributedAppBuilder.Configuration["Github:AppKey"])
-    //.WithReference(agentHostHttpsWebHookEndpoint)
-    //.WithHttpsEndpoint(port: 5244, targetPort: 5244, isProxied: false, name: "githubapp-webhook")
-    .WithHttpEndpoint(port: 5244, targetPort: 5244, isProxied: false, name: "githubapp-webhook")
-    // External endpoints are used to communicate with the GithubApp webhook
-    //.WithExternalHttpEndpoints()
+    .WithHttpsEndpoint(port: 5244, targetPort: 5244, isProxied: false, name: "githubapp-https-webhook")
     .WaitFor(autoGenAgentHostContainer)
     .WaitFor(qdrant);
-
-dotnet.GetEndpoint("https");
 
 //TODO: add this to the config in backend
 //.WithEnvironment("", acaSessionsEndpoint);
 
-//// Use this as a starting point to somehow get MagenticOne into the mix of AutoGen agents
-//using Aspire.Hosting.Python;
+// Use this as a starting point to somehow get MagenticOne into the mix of AutoGen agents
 //const string pythonHelloAgentPath = "../core_xlang_hello_python_agent";
 //const string pythonHelloAgentPy = "hello_python_agent.py";
 //const string pythonVEnv = "../../../../python/.venv";
@@ -105,8 +97,8 @@ dotnet.GetEndpoint("https");
 //IResourceBuilder<PythonAppResource>? python;
 //// xlang is over http for now - in prod use TLS between containers
 //python = distributedAppBuilder.AddPythonApp("HelloAgentTestsPython", pythonHelloAgentPath, pythonHelloAgentPy, pythonVEnv)
-//    .WithReference(autoGenAgentHost)
-//    .WithEnvironment("AGENT_HOST", autoGenAgentHost.GetEndpoint("http"))
+//    .WithReference(autoGenAgentHostContainer)
+//    .WithEnvironment("AGENT_HOST", $"{agentHostHttpEndpointForXlang.Property(EndpointProperty.Url)}")
 //    .WithEnvironment("STAY_ALIVE_ON_GOODBYE", "true")
 //    .WithEnvironment("GRPC_DNS_RESOLVER", "native")
 //    .WithOtlpExporter()
