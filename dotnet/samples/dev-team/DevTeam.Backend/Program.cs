@@ -64,7 +64,7 @@ var kestrel = webAppBuilder.WebHost.ConfigureKestrel(options =>
         }
 
         // Require client certificates
-        httpsOptions.ClientCertificateMode = ClientCertificateMode.RequireCertificate;
+        httpsOptions.ClientCertificateMode = Debugger.IsAttached ? ClientCertificateMode.NoCertificate : ClientCertificateMode.RequireCertificate;
         httpsOptions.CheckCertificateRevocation = Debugger.IsAttached ? false : true;
     });
 });
