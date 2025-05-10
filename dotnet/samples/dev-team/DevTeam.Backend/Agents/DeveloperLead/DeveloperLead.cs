@@ -11,7 +11,7 @@ using Microsoft.SemanticKernel.Memory;
 
 namespace DevTeam.Backend.Agents.DeveloperLead;
 
-[TypeSubscription(SkillType.DeveloperLead)]
+[TypeSubscription(SkillPersona.DeveloperLead)]
 public class DeveloperLead(
     [FromKeyedServices("AgentsMetadata")] AgentsMetadata agentsMetadata,
     ISemanticTextMemory semanticTextMemory,
@@ -32,7 +32,7 @@ public class DeveloperLead(
         // Get the topic from the agent metadata
         var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
         // TODO: How to handle multiple topics?
-        var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
+        var topic = topics?.FirstOrDefault() ?? SkillPersona.DevTeam;
 
         await PublishMessageAsync(
             new DevPlanGenerated
@@ -48,7 +48,7 @@ public class DeveloperLead(
         // Get the topic from the agent metadata
         var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
         // TODO: How to handle multiple topics?
-        var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
+        var topic = topics?.FirstOrDefault() ?? SkillPersona.DevTeam;
 
         await PublishMessageAsync(
             new DevPlanCreated

@@ -9,7 +9,7 @@ using Microsoft.AutoGen.RuntimeGateway.Grpc.Tests;
 
 namespace DevTeam.Backend.Agents;
 
-[TypeSubscription(SkillType.AzureGenie)]
+[TypeSubscription(SkillPersona.AzureGenie)]
 public class AzureGenie(
     [FromKeyedServices("AgentsMetadata")] AgentsMetadata agentsMetadata,
     IManageAzure azureService,
@@ -31,7 +31,7 @@ public class AzureGenie(
         // Get the topic from the agent metadata
         var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
         // TODO: How to handle multiple topics?
-        var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
+        var topic = topics?.FirstOrDefault() ?? SkillPersona.DevTeam;
 
         await PublishMessageAsync(
             new ReadmeStored { },
@@ -51,7 +51,7 @@ public class AzureGenie(
         // Read the Topic from the agent metadata
         var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
         // TODO: How to handle multiple topics?
-        var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
+        var topic = topics?.FirstOrDefault() ?? SkillPersona.DevTeam;
 
         await PublishMessageAsync(
             new SandboxRunCreated

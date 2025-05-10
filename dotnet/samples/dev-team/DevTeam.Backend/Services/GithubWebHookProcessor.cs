@@ -150,17 +150,17 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
 
     }
 
-    private async Task HandleAskApproval(string? userName, string userMessage, string skillType, string skill, string topicSource)
+    private async Task HandleAskApproval(string? userName, string userMessage, string skillPersona, string skillActivity, string topicSource)
     {
         try
         {
             _logger.LogInformation("Handling ask approval");
 
-            IMessage askApprovalMessage = (skillType, skill) switch
+            IMessage askApprovalMessage = (skillPersona, skillActivity) switch
             {
-                (SkillType.ProductOwner, PMSkills.Readme) => new ReadmeIssueClosed { UserName = userName, UserMessage = userMessage },
-                (SkillType.DeveloperLead, DeveloperLeadSkills.Plan) => new DevPlanIssueClosed { UserName = userName, UserMessage = userMessage },
-                (SkillType.Developer, DeveloperSkills.Implement) => new CodeIssueClosed { UserName = userName, UserMessage = userMessage },
+                (SkillPersona.ProductOwner, PMSkills.Readme) => new ReadmeIssueClosed { UserName = userName, UserMessage = userMessage },
+                (SkillPersona.DeveloperLead, DeveloperLeadSkills.Plan) => new DevPlanIssueClosed { UserName = userName, UserMessage = userMessage },
+                (SkillPersona.Developer, DeveloperSkills.Implement) => new CodeIssueClosed { UserName = userName, UserMessage = userMessage },
                 _ => new CloudEvent() // TODO: default event
                                       // There is a bug in the agent message flow
                                       // Create a new issue explaining which skillName and functionName are not handled
@@ -168,7 +168,7 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
                                       // Can the CloudEvent be used to create a new issue?
             };
 
-            await _agentRuntime.PublishMessageAsync(askApprovalMessage, new TopicId(skillType, topicSource));
+            await _agentRuntime.PublishMessageAsync(askApprovalMessage, new TopicId(skillPersona, topicSource));
         }
         catch (Exception ex)
         {
@@ -177,18 +177,19 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
         }
     }
 
-    private async Task HandleNewAsk(string? userName, string userMessage, string skillName, string functionName, string topicSource)
+    private async Task HandleNewAsk(string? userName, string userMessage, string skillPersona, string skillActivity, string topicSource)
     {
         try
         {
-            _logger.LogInformation("Handling new ask");
+            _logger.LogDebug($"Handling new ask from {userName} to {skillPersona}.{skillActivity} about {topicSource}");
+            _logger.LogTrace($"User message: {userMessage}");
 
-            IMessage newAskMessage = (skillName, functionName) switch
+            IMessage newAskMessage = (skillPersona, skillActivity) switch
             {
-                (SkillType.Stakeholder, StakeholderSkills.Ask) => new NewAsk { UserName = userName, UserMessage = userMessage },
-                (SkillType.ProductOwner, PMSkills.Readme) => new ReadmeRequested { UserName = userName, UserMessage = userMessage },
-                (SkillType.DeveloperLead, DeveloperLeadSkills.Plan) => new DevPlanRequested { UserName = userName, UserMessage = userMessage },
-                (SkillType.Developer, DeveloperSkills.Implement) => new CodeGenerationRequested {UserName = userName, UserMessage = userMessage },
+                (SkillPersona.Stakeholder, StakeholderActivity.Ask) => new NewAsk { UserName = userName, UserMessage = userMessage },
+                (SkillPersona.ProductOwner, PMSkills.Readme) => new ReadmeRequested { UserName = userName, UserMessage = userMessage },
+                (SkillPersona.DeveloperLead, DeveloperLeadSkills.Plan) => new DevPlanRequested { UserName = userName, UserMessage = userMessage },
+                (SkillPersona.Developer, DeveloperSkills.Implement) => new CodeGenerationRequested {UserName = userName, UserMessage = userMessage },
                 _ => new CloudEvent()
                 // If the issue already exists and we are responding to a comment
                 // Reply with comment listing the available skill types and corresponding skills
@@ -196,7 +197,7 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
 
             // skill type is used as the typic type
             // Agent implementations subscribe to their corresponding topic type
-            await _agentRuntime.PublishMessageAsync(newAskMessage, new TopicId(skillName, topicSource));
+            await _agentRuntime.PublishMessageAsync(newAskMessage, new TopicId(skillPersona, topicSource));
         }
         catch (Exception ex)
         {

@@ -11,7 +11,7 @@ using Microsoft.SemanticKernel.Memory;
 
 namespace DevTeam.Backend.Agents.ProductManager;
 
-[TypeSubscription(SkillType.ProductOwner)]
+[TypeSubscription(SkillPersona.ProductOwner)]
 public class ProductManager(
     [FromKeyedServices("AgentsMetadata")] AgentsMetadata agentsMetadata,
     ISemanticTextMemory semanticTextMemory,
@@ -37,7 +37,7 @@ public class ProductManager(
         // Get the topic from the agent metadata
         var topics = agentsMetadata.GetTopicsForAgent(typeof(ProductManager));
         // TODO: How to handle multiple topics?
-        var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
+        var topic = topics?.FirstOrDefault() ?? SkillPersona.DevTeam;
 
         await PublishMessageAsync(
             new ReadmeGenerated
@@ -53,7 +53,7 @@ public class ProductManager(
         // Get the topic from the agent metadata
         var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
         // TODO: How to handle multiple topics?
-        var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
+        var topic = topics?.FirstOrDefault() ?? SkillPersona.DevTeam;
 
         await PublishMessageAsync(
             new ReadmeCreated

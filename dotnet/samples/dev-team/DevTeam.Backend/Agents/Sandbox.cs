@@ -13,7 +13,7 @@ using Orleans.Timers;
 
 namespace DevTeam.Backend;
 
-[TypeSubscription(SkillType.Sandbox)]
+[TypeSubscription(SkillPersona.Sandbox)]
 public sealed class Sandbox(
     [FromKeyedServices("AgentsMetadata")] AgentsMetadata agentsMetadata,
     IManageAzure azureService,
@@ -69,7 +69,7 @@ public sealed class Sandbox(
                 // Get the topic from the agent metadata
                 var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
                 // TODO: How to handle multiple topics?
-                var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
+                var topic = topics?.FirstOrDefault() ?? SkillPersona.DevTeam;
 
                 await PublishMessageAsync(new SandboxRunFinished
                 {

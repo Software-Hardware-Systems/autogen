@@ -18,7 +18,7 @@ namespace DevTeam.Backend.Agents;
 /// <param name="id">Identifies the agent within the system.</param>
 /// <param name="runtime">Provides the execution context for the agent's operations.</param>
 /// <param name="logger">Facilitates logging for tracking the agent's activities and errors.</param>
-[TypeSubscription(SkillType.Hubber)]
+[TypeSubscription(SkillPersona.Hubber)]
 public class Hubber(
     IManageGithub ghService,
     AgentId id,
@@ -53,11 +53,11 @@ public class Hubber(
 
         // Note that the newAsk user message is incorporated into both the PM and DevLead issues
 
-        var pmIssue = await ghService.CreateIssue(org, repo, newAsk.UserMessage, $"{SkillType.ProductOwner}.{nameof(PMSkills.Readme)}", issueNumber);
-        await ghService.PostComment(org, repo, issueNumber, $" - #{pmIssue} - tracks {SkillType.ProductOwner}.{nameof(PMSkills.Readme)}");
+        var pmIssue = await ghService.CreateIssue(org, repo, newAsk.UserMessage, $"{SkillPersona.ProductOwner}.{nameof(PMSkills.Readme)}", issueNumber);
+        await ghService.PostComment(org, repo, issueNumber, $" - #{pmIssue} - tracks {SkillPersona.ProductOwner}.{nameof(PMSkills.Readme)}");
 
-        var devLeadIssue = await ghService.CreateIssue(org, repo, newAsk.UserMessage, $"{SkillType.DeveloperLead}.{nameof(DeveloperLeadSkills.Plan)}", issueNumber);
-        await ghService.PostComment(org, repo, issueNumber, $" - #{devLeadIssue} - tracks {SkillType.DeveloperLead}.{nameof(DeveloperLeadSkills.Plan)}");
+        var devLeadIssue = await ghService.CreateIssue(org, repo, newAsk.UserMessage, $"{SkillPersona.DeveloperLead}.{nameof(DeveloperLeadSkills.Plan)}", issueNumber);
+        await ghService.PostComment(org, repo, issueNumber, $" - #{devLeadIssue} - tracks {SkillPersona.DeveloperLead}.{nameof(DeveloperLeadSkills.Plan)}");
     }
 
     /// <summary>

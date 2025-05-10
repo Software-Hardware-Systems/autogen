@@ -10,6 +10,7 @@ using DevTeam.Backend.Agents;
 using DevTeam.Backend.Agents.Developer;
 using DevTeam.Backend.Agents.DeveloperLead;
 using DevTeam.Backend.Agents.ProductManager;
+using DevTeam.Backend.Agents.Stakeholder;
 using DevTeam.Backend.Services;
 using DevTeam.Options;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
@@ -88,12 +89,14 @@ agentsAppBuilder.Configuration["AGENT_HOST"] = webAppBuilder.Configuration["AGEN
 agentsAppBuilder.Configuration["AgentHostCert:Path"] = webAppBuilder.Configuration["AgentHostCert:Path"];
 agentsAppBuilder.Configuration["AgentHostCert:Password"] = webAppBuilder.Configuration["AgentHostCert:Password"];
 agentsAppBuilder.AddGrpcAgentWorker()
+    .AddAgent<Stakeholder>(nameof(Stakeholder))
+    .AddAgent<ProductManager>(nameof(ProductManager))
+    .AddAgent<DeveloperLead>(nameof(DeveloperLead))
+    .AddAgent<Dev>(nameof(Dev))
     .AddAgent<AzureGenie>(nameof(AzureGenie))
     .AddAgent<Sandbox>(nameof(Sandbox))
     .AddAgent<Hubber>(nameof(Hubber))
-    .AddAgent<Dev>(nameof(Dev))
-    .AddAgent<ProductManager>(nameof(ProductManager))
-    .AddAgent<DeveloperLead>(nameof(DeveloperLead));
+    ;
 
 var agentsApp = await agentsAppBuilder.BuildAsync();
 await agentsApp.StartAsync();

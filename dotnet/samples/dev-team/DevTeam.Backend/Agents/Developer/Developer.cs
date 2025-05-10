@@ -10,7 +10,7 @@ using Microsoft.SemanticKernel.Memory;
 
 namespace DevTeam.Backend.Agents.Developer;
 
-[TypeSubscription(SkillType.Developer)]
+[TypeSubscription(SkillPersona.Developer)]
 public class Dev(
     [FromKeyedServices("AgentsMetadata")] AgentsMetadata agentsMetadata,
     ISemanticTextMemory semanticTextMemory,
@@ -31,7 +31,7 @@ public class Dev(
         // Get the topic from the agent metadata
         var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
         // TODO: How to handle multiple topics?
-        var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
+        var topic = topics?.FirstOrDefault() ?? SkillPersona.DevTeam;
 
         await PublishMessageAsync(
             new CodeGenerated
@@ -47,7 +47,7 @@ public class Dev(
         // Get the topic from the agent metadata
         var topics = agentsMetadata.GetTopicsForAgent(typeof(Dev));
         // TODO: How to handle multiple topics?
-        var topic = topics?.FirstOrDefault() ?? SkillType.DevTeam;
+        var topic = topics?.FirstOrDefault() ?? SkillPersona.DevTeam;
 
         await PublishMessageAsync(
             new CodeCreated
