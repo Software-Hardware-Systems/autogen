@@ -31,10 +31,10 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
             var org = issuesEvent.Repository?.Owner.Login ?? throw new InvalidOperationException("Repository owner login is null");
             var repo = issuesEvent.Repository?.Name ?? throw new InvalidOperationException("Repository name is null");
             var issueNumber = issuesEvent.Issue?.Number ?? throw new InvalidOperationException("Issue number is null");
-            var userName = issuesEvent.Issue?.User.Name;
+            var userName = issuesEvent.Issue.User.Name ?? issuesEvent.Issue.User.Login ?? issuesEvent.Organization!.Login;
             var userAsk = issuesEvent.Issue?.Body ?? string.Empty;
 
-            _logger.LogInformation($"{userName ?? "Somebody"} {(issuesEvent.Action == IssuesAction.Opened ? "Opened" : "Closed")} {org}-{repo}-{issueNumber} with Labels: {string.Join(",", issuesEvent.Issue?.Labels?.Select(l => l.Name) ?? Array.Empty<string>())}");
+            _logger.LogInformation($"{issuesEvent.Sender!.Type.Value} {userName ?? "Somebody"} {issuesEvent.Action} {org}-{repo}-{issueNumber} {string.Join(",", issuesEvent.Issue?.Labels?.Select(l => l.Name) ?? Array.Empty<string>())}");
 
             // Note that we do process new issues even if the user is a bot
 
@@ -98,10 +98,10 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
             var org = issueCommentEvent.Repository!.Owner.Login;
             var repo = issueCommentEvent.Repository.Name;
             var issueNumber = issueCommentEvent.Issue.Number;
-            var userName = issueCommentEvent.Comment.User.Name ?? issueCommentEvent.Comment.User.Login;
+            var userName = issueCommentEvent.Comment.User.Name ?? issueCommentEvent.Comment.User.Login ?? issueCommentEvent.Organization!.Login;
             var userComment = issueCommentEvent.Comment.Body;
 
-            _logger.LogInformation($"{userName ?? "Somebody"} commented on {org}-{repo}-{issueNumber} with Labels: {string.Join(",", issueCommentEvent.Issue.Labels.Select(l => l.Name))}");
+            _logger.LogInformation($"{issueCommentEvent.Sender!.Type.Value} {userName ?? "Somebody"} {issueCommentEvent.Action} {org}-{repo}-{issueNumber} {string.Join(",", issueCommentEvent.Issue.Labels.Select(l => l.Name))}");
 
             // We skip processing if the comment is from a bot because
             // the bot creates comments to converse with the user
