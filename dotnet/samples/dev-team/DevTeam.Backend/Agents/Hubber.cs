@@ -26,7 +26,8 @@ public class Hubber(
     ILogger<Hubber>? logger = null)
     :
     BaseAgent(id, runtime, nameof(Hubber), logger),
-    IHandle<StakeholderAsk>,
+    IHandle<StakeholderAsked>,
+    IHandle<StakeholderAnswered>,
     IHandle<ReadmeGenerated>,
     IHandle<DevPlanGenerated>,
     IHandle<DevPlanCreated>,
@@ -45,7 +46,7 @@ public class Hubber(
     /// <param name="stakeholderAsk"></param>
     /// <param name="messageContext"></param>
     /// <returns></returns>
-    public async ValueTask HandleAsync(StakeholderAsk stakeholderAsk, MessageContext messageContext)
+    public async ValueTask HandleAsync(StakeholderAsked stakeholderAsk, MessageContext messageContext)
     {
         var (org, repo, issueNumber, _) = ExtractDetailsFromTopicSource(messageContext.Topic);
 
@@ -53,11 +54,17 @@ public class Hubber(
 
         // Note that the newAsk user message is incorporated into both the PM and DevLead issues
 
-        var pmIssue = await ghService.CreateIssue(org, repo, stakeholderAsk.UserMessage, $"{SkillPersona.ProductOwner}.{nameof(PMSkills.Readme)}", issueNumber);
+        var pmIssue = await ghService.CreateIssue(org, repo, stakeholderAsk.Response, $"{SkillPersona.ProductOwner}.{nameof(PMSkills.Readme)}", issueNumber);
         await ghService.PostComment(org, repo, issueNumber, $" - #{pmIssue} - tracks {SkillPersona.ProductOwner}.{nameof(PMSkills.Readme)}");
 
-        var devLeadIssue = await ghService.CreateIssue(org, repo, stakeholderAsk.UserMessage, $"{SkillPersona.DeveloperLead}.{nameof(DeveloperLeadSkills.Plan)}", issueNumber);
+        var devLeadIssue = await ghService.CreateIssue(org, repo, stakeholderAsk.Response, $"{SkillPersona.DeveloperLead}.{nameof(DeveloperLeadSkills.Plan)}", issueNumber);
         await ghService.PostComment(org, repo, issueNumber, $" - #{devLeadIssue} - tracks {SkillPersona.DeveloperLead}.{nameof(DeveloperLeadSkills.Plan)}");
+    }
+
+    public async ValueTask HandleAsync(StakeholderAnswered stakeholderAnswer, MessageContext messageContext)
+    {
+        var (org, repo, issueNumber, _) = ExtractDetailsFromTopicSource(messageContext.Topic);
+        await ghService.PostComment(org, repo, issueNumber, stakeholderAnswer.Response);
     }
 
     /// <summary>

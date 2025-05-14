@@ -35,8 +35,8 @@ public class Stakeholder(
     {
         var response = await GenerateStakeholderResponse("Ask", ask.UserName, ask.UserMessage);
         await PublishMessageAsync(
-            new StakeholderAsked { Response = response },
-            topic: messageContext.Topic ?? new TopicId(SkillPersona.Stakeholder)
+            new StakeholderAnswered { Response = response },
+            topic: new TopicId(SkillPersona.Hubber, messageContext.Topic!.Value.Source)
         ).ConfigureAwait(false);
     }
 
@@ -45,7 +45,7 @@ public class Stakeholder(
         var response = await GenerateStakeholderResponse("Answer", answer.UserName, answer.UserMessage);
         await PublishMessageAsync(
             new StakeholderAnswered { Response = response },
-            topic: messageContext.Topic ?? new TopicId(SkillPersona.Stakeholder)
+            topic: messageContext.Topic ?? new TopicId(SkillPersona.Hubber)
         ).ConfigureAwait(false);
     }
 
