@@ -26,7 +26,7 @@ public class Hubber(
     ILogger<Hubber>? logger = null)
     :
     BaseAgent(id, runtime, nameof(Hubber), logger),
-    IHandle<NewAsk>,
+    IHandle<StakeholderAsk>,
     IHandle<ReadmeGenerated>,
     IHandle<DevPlanGenerated>,
     IHandle<DevPlanCreated>,
@@ -34,7 +34,7 @@ public class Hubber(
     IHandle<CodeGenerated>
 {
     /// <summary>
-    /// When the user creates a new Issue (NewAsk), create two new issues:
+    /// When the user creates a new Issue (StakeholderAsk), create two new issues:
     /// One for the PM to create a README.md file
     /// Another for the DevLead to create a plan
     /// Then create a new branch for the dev-team to work on
@@ -42,10 +42,10 @@ public class Hubber(
     /// The comments contain magic strings PM.Readme and DevLead.Plan to
     /// indicate which dev-team agent should handle the issue
     /// </summary>
-    /// <param name="newAsk"></param>
+    /// <param name="stakeholderAsk"></param>
     /// <param name="messageContext"></param>
     /// <returns></returns>
-    public async ValueTask HandleAsync(NewAsk newAsk, MessageContext messageContext)
+    public async ValueTask HandleAsync(StakeholderAsk stakeholderAsk, MessageContext messageContext)
     {
         var (org, repo, issueNumber, _) = ExtractDetailsFromTopicSource(messageContext.Topic);
 
@@ -53,10 +53,10 @@ public class Hubber(
 
         // Note that the newAsk user message is incorporated into both the PM and DevLead issues
 
-        var pmIssue = await ghService.CreateIssue(org, repo, newAsk.UserMessage, $"{SkillPersona.ProductOwner}.{nameof(PMSkills.Readme)}", issueNumber);
+        var pmIssue = await ghService.CreateIssue(org, repo, stakeholderAsk.UserMessage, $"{SkillPersona.ProductOwner}.{nameof(PMSkills.Readme)}", issueNumber);
         await ghService.PostComment(org, repo, issueNumber, $" - #{pmIssue} - tracks {SkillPersona.ProductOwner}.{nameof(PMSkills.Readme)}");
 
-        var devLeadIssue = await ghService.CreateIssue(org, repo, newAsk.UserMessage, $"{SkillPersona.DeveloperLead}.{nameof(DeveloperLeadSkills.Plan)}", issueNumber);
+        var devLeadIssue = await ghService.CreateIssue(org, repo, stakeholderAsk.UserMessage, $"{SkillPersona.DeveloperLead}.{nameof(DeveloperLeadSkills.Plan)}", issueNumber);
         await ghService.PostComment(org, repo, issueNumber, $" - #{devLeadIssue} - tracks {SkillPersona.DeveloperLead}.{nameof(DeveloperLeadSkills.Plan)}");
     }
 

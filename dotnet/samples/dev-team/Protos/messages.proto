@@ -14,11 +14,69 @@ option csharp_namespace = "DevTeam";
 //      - Posts a comment on the readme issue to initiate the Product Manager workflow.
 //  - Creates a new Developer Lead code issue, incorporating the original ask.
 //      - Posts a comment on the code issue to initiate the Developer Lead workflow.
-message NewAsk {
+//message NewAsk {
+  // The user's name
+//  string user_name = 1;
+  // The user's natural language request or description of the task.
+//  string user_message = 2;
+//}
+
+// Stakeholder Activity Messages
+
+// Message published when a stakeholder asks a question or makes a request.
+message StakeholderAsk {
   // The user's name
   string user_name = 1;
   // The user's natural language request or description of the task.
   string user_message = 2;
+}
+
+// Message published in response to a StakeholderAsk.
+message StakeholderAsked {
+  // The response to the stakeholder's ask.
+  string response = 1;
+}
+
+// Message published when a stakeholder provides an answer.
+message StakeholderAnswer {
+  // The user's name
+  string user_name = 1;
+  // The user's answer or message.
+  string user_message = 2;
+}
+
+// Message published in response to a StakeholderAnswer.
+message StakeholderAnswered {
+  // The response to the stakeholder's answer.
+  string response = 1;
+}
+
+// Message published when a stakeholder submits a review.
+message StakeholderReview {
+  // The user's name
+  string user_name = 1;
+  // The user's review message.
+  string user_message = 2;
+}
+
+// Message published in response to a StakeholderReview.
+message StakeholderReviewed {
+  // The response to the stakeholder's review.
+  string response = 1;
+}
+
+// Message published when a stakeholder approves something.
+message StakeholderApprove {
+  // The user's name
+  string user_name = 1;
+  // The user's approval message.
+  string user_message = 2;
+}
+
+// Message published in response to a StakeholderApprove.
+message StakeholderApproved {
+  // The response to the stakeholder's approval.
+  string response = 1;
 }
 
 // ReadmeRequested Message: Published whenever a GitHub issue, assigned to the Program Manager, is created or commentted on.

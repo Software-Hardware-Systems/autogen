@@ -7,20 +7,21 @@ using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
 using Microsoft.AutoGen.RuntimeGateway.Grpc.Tests;
 using Microsoft.Extensions.AI;
-using Microsoft.SemanticKernel.Memory;
+//using Microsoft.Extensions.VectorData;
 
 namespace DevTeam.Backend.Agents.DeveloperLead;
 
 [TypeSubscription(SkillPersona.DeveloperLead)]
 public class DeveloperLead(
     [FromKeyedServices("AgentsMetadata")] AgentsMetadata agentsMetadata,
-    ISemanticTextMemory semanticTextMemory,
     IChatClient chatClient,
+    //IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
+    //IVectorStore vectorStore,
     AgentId id,
     IAgentRuntime runtime,
     Logger<AiAgent<DeveloperLead>>? logger = null)
     :
-    AiAgent<DeveloperLead>(semanticTextMemory, chatClient, id, runtime, logger),
+    AiAgent<DeveloperLead>(chatClient, id, runtime, logger),
     ILeadDevelopers,
     IHandle<DevPlanRequested>,
     IHandle<DevPlanIssueClosed>

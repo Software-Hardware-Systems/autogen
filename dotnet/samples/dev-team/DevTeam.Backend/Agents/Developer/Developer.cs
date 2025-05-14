@@ -6,20 +6,21 @@ using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
 using Microsoft.AutoGen.RuntimeGateway.Grpc.Tests;
 using Microsoft.Extensions.AI;
-using Microsoft.SemanticKernel.Memory;
+//using Microsoft.Extensions.VectorData;
 
 namespace DevTeam.Backend.Agents.Developer;
 
 [TypeSubscription(SkillPersona.Developer)]
 public class Dev(
     [FromKeyedServices("AgentsMetadata")] AgentsMetadata agentsMetadata,
-    ISemanticTextMemory semanticTextMemory,
     IChatClient chatClient,
+    //IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
+    //IVectorStore vectorStore,
     AgentId id,
     IAgentRuntime runtime,
     Logger<AiAgent<Dev>>? logger = null)
     :
-    AiAgent<Dev>(semanticTextMemory, chatClient, id, runtime, logger),
+    AiAgent<Dev>(chatClient, id, runtime, logger),
     IDevelopApps,
     IHandle<CodeGenerationRequested>,
     IHandle<CodeIssueClosed>

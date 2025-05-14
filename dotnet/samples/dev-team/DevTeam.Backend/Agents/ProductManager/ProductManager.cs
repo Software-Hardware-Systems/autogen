@@ -7,20 +7,21 @@ using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
 using Microsoft.AutoGen.RuntimeGateway.Grpc.Tests;
 using Microsoft.Extensions.AI;
-using Microsoft.SemanticKernel.Memory;
+//using Microsoft.Extensions.VectorData;
 
 namespace DevTeam.Backend.Agents.ProductManager;
 
 [TypeSubscription(SkillPersona.ProductOwner)]
 public class ProductManager(
     [FromKeyedServices("AgentsMetadata")] AgentsMetadata agentsMetadata,
-    ISemanticTextMemory semanticTextMemory,
     IChatClient chatClient,
+    //IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
+    //IVectorStore vectorStore,
     AgentId id,
     IAgentRuntime runtime,
     Logger<AiAgent<ProductManager>>? logger = null)
     :
-    AiAgent<ProductManager>(semanticTextMemory, chatClient, id, runtime, logger),
+    AiAgent<ProductManager>(chatClient, id, runtime, logger),
     IHandle<ReadmeIssueClosed>,
     IHandle<ReadmeRequested>,
     IManageProducts

@@ -2,33 +2,35 @@
 // AiAgent.cs
 
 using System.ComponentModel;
-using System.Text;
 using System.Text.Json;
 using Microsoft.AutoGen.AgentChat.State;
 using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
 using Microsoft.Extensions.AI;
-using Microsoft.SemanticKernel.Memory;
+//using Microsoft.Extensions.VectorData;
 
 namespace DevTeam.Agents;
 
 public class AiAgent<T> : BaseAgent
 {
     public AiAgent(
-        ISemanticTextMemory semanticTextMemory,
         IChatClient chatClient,
+        //IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
+        //IVectorStore vectorStore,
         AgentId id,
         IAgentRuntime runtime,
         ILogger<AiAgent<T>>? logger = null)
         :
         base(id, runtime, nameof(AiAgent<T>), logger)
     {
-        _semanticTextMemory = semanticTextMemory;
+        //_embeddingGenerator = embeddingGenerator;
+        //_vectorStore = vectorStore;
         _chatClient = chatClient;
         _chatOptions = new() { Tools = [AIFunctionFactory.Create(RetrieveAdditionalKnowledge)] };
     }
 
-    private ISemanticTextMemory _semanticTextMemory;
+    //private IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
+    //private IVectorStore _vectorStore;
     private IChatClient _chatClient;
     private ChatOptions _chatOptions;
 
@@ -112,16 +114,7 @@ public class AiAgent<T> : BaseAgent
     [Description("Retrieves additional knowledge based on the provided input from a specified collection")]
     private async Task<string> RetrieveAdditionalKnowledge(string knowledgeCollection, string input, int limit = 5)
     {
-        IAsyncEnumerable<MemoryQueryResult> retrievedKnowledgeResults = _semanticTextMemory.SearchAsync(knowledgeCollection, input, limit);
-
-        var retrievedKnowledgePromptBuilder = new StringBuilder();
-        await foreach (var retrievedKnowledgeItem in retrievedKnowledgeResults)
-        {
-            retrievedKnowledgePromptBuilder.AppendLine(retrievedKnowledgeItem.Metadata.Text);
-        }
-        var retrievedKnowledge = retrievedKnowledgePromptBuilder.ToString();
-
-        return retrievedKnowledge;
+        return string.Empty;
     }
 
     protected async Task<string> GenerateResponseUsing(string agentPrompt, string UserName, string userAsk)

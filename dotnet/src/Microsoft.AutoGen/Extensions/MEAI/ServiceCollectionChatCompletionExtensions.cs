@@ -34,6 +34,26 @@ public static class ServiceCollectionChatClientExtensions
             new Uri($"http://{serviceName}"),
             builder);
     }
+    public static IServiceCollection AddOllamaEmbeddingGenerator(
+        this IHostApplicationBuilder hostBuilder,
+        string serviceName,
+        Func<EmbeddingGeneratorBuilder<string, Embedding<float>>, EmbeddingGeneratorBuilder<string, Embedding<float>>>? builder = null,
+        string? modelName = null)
+    {
+        if (modelName is null)
+        {
+            var configKey = $"{serviceName}:LlmModelName";
+            modelName = hostBuilder.Configuration[configKey];
+            if (string.IsNullOrEmpty(modelName))
+            {
+                throw new InvalidOperationException($"No {nameof(modelName)} was specified, and none could be found from configuration at '{configKey}'");
+            }
+        }
+        return hostBuilder.Services.AddOllamaEmbeddingGenerator(
+            modelName,
+            new Uri($"http://{serviceName}"),
+            builder);
+    }
     public static IServiceCollection AddOllamaChatClient(
         this IServiceCollection services,
         string modelName,
@@ -43,9 +63,44 @@ public static class ServiceCollectionChatClientExtensions
         uri ??= new Uri("http://localhost:11434");
         services.AddChatClient(service =>
         {
-            var httpClient = service.GetService<HttpClient>() ?? new();
-            return new OllamaChatClient(uri, modelName, httpClient);
+            var httpClient = service.GetService<HttpClient>() ?? new HttpClient();
+            var baseClient = new OllamaChatClient(uri, modelName, httpClient);
+            var builderInstance = new ChatClientBuilder(baseClient);
+
+            if (builder != null)
+            {
+                builderInstance = builder(builderInstance);
+            }
+
+            return builderInstance.Build();
         });
+
+        return services;
+    }
+    public static IServiceCollection AddOllamaEmbeddingGenerator(
+        this IServiceCollection services,
+        string modelName,
+        Uri? uri = null,
+        Func<EmbeddingGeneratorBuilder<string, Embedding<float>>, EmbeddingGeneratorBuilder<string, Embedding<float>>>? builder = null)
+    {
+        uri ??= new Uri("http://localhost:11434");
+        services.AddEmbeddingGenerator(service =>
+        {
+            var httpClient = service.GetService<HttpClient>() ?? new HttpClient();
+            var baseGenerator = new OllamaEmbeddingGenerator(uri, modelName, httpClient);
+            var builderInstance = new EmbeddingGeneratorBuilder<string, Embedding<float>>(baseGenerator);
+
+            if (builder != null)
+            {
+                builderInstance = builder(builderInstance);
+            }
+
+            return builderInstance.Build();
+        });
+
+        // Any consumer requesting IEmbeddingGenerator will get the same instance as IEmbeddingGenerator<string, Embedding<float>>
+        services.AddSingleton<IEmbeddingGenerator>(sp =>
+            sp.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>());
 
         return services;
     }

@@ -73,14 +73,15 @@ var kestrel = webAppBuilder.WebHost.ConfigureKestrel(options =>
 // The using alias points to the DevTeam.ServiceDefaults implementation of AddServiceDefaults
 DevTeamServiceDefaults.AddServiceDefaults(webAppBuilder);
 
-// Azure.AI is used for chat completion services
-webAppBuilder.AddChatCompletionService("AIClientOptions");
+// gRPC AspNetCore support is used for AutoGen agent communication infrastructure
+webAppBuilder.Services.AddGrpc();
+
+// Microsoft Extensions AI is used for chat and embedding generation
+//webAppBuilder.AddChatCompletionService("AIClientOptions");
+//webAppBuilder.AddEmbeddingGeneratorService("AIClientOptions");
 
 // Semantic Kernel is used for storing knowledge documents into VectorMemory
 webAppBuilder.ConfigureSemanticKernel();
-
-// gRPC AspNetCore support is used for AutoGen agent communication infrastructure
-webAppBuilder.Services.AddGrpc();
 
 // Configure the AgentsAppBuilder to register agents with the gRPC Agent-Host.
 // This demonstrates how to register multiple agents for the sample application.
@@ -97,6 +98,11 @@ agentsAppBuilder.AddGrpcAgentWorker()
     .AddAgent<Sandbox>(nameof(Sandbox))
     .AddAgent<Hubber>(nameof(Hubber))
     ;
+
+agentsAppBuilder.Services.AddMemoryCache(); // Registers IMemoryCache
+agentsAppBuilder.Services.AddDistributedMemoryCache(); // Registers IDistributedCache as MemoryDistributedCache
+agentsAppBuilder.Services.AddOllamaChatClient(webAppBuilder.Configuration["AIClientOptions:LlmModelName"] ?? string.Empty);
+agentsAppBuilder.Services.AddOllamaEmbeddingGenerator(webAppBuilder.Configuration["AIClientOptions:LlmModelName"] ?? string.Empty);
 
 var agentsApp = await agentsAppBuilder.BuildAsync();
 await agentsApp.StartAsync();

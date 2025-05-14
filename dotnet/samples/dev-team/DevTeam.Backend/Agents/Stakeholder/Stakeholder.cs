@@ -6,20 +6,21 @@ using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
 //using Microsoft.AutoGen.RuntimeGateway.Grpc.Tests;
 using Microsoft.Extensions.AI;
-using Microsoft.SemanticKernel.Memory;
+//using Microsoft.Extensions.VectorData;
 
 namespace DevTeam.Backend.Agents.Stakeholder;
 
 [TypeSubscription(SkillPersona.Stakeholder)]
 public class Stakeholder(
     //[FromKeyedServices("AgentsMetadata")] AgentsMetadata agentsMetadata,
-    ISemanticTextMemory semanticTextMemory,
     IChatClient chatClient,
+    //IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
+    //IVectorStore vectorStore,
     AgentId id,
     IAgentRuntime runtime,
     Logger<AiAgent<Stakeholder>>? logger = null)
     :
-    AiAgent<Stakeholder>(semanticTextMemory, chatClient, id, runtime, logger),
+    AiAgent<Stakeholder>(chatClient, /*embeddingGenerator,*/ /*vectorStore,*/ id, runtime, logger),
     IHandle<StakeholderAsk>,
     IHandle<StakeholderAnswer>,
     IHandle<StakeholderReview>,
@@ -82,45 +83,4 @@ public class Stakeholder(
             return "";
         }
     }
-}
-
-// Message contracts for StakeholderActivity
-public class StakeholderAsk
-{
-    public string UserName { get; set; } = string.Empty;
-    public string UserMessage { get; set; } = string.Empty;
-}
-public class StakeholderAsked
-{
-    public string Response { get; set; } = string.Empty;
-}
-
-public class StakeholderAnswer
-{
-    public string UserName { get; set; } = string.Empty;
-    public string UserMessage { get; set; } = string.Empty;
-}
-public class StakeholderAnswered
-{
-    public string Response { get; set; } = string.Empty;
-}
-
-public class StakeholderReview
-{
-    public string UserName { get; set; } = string.Empty;
-    public string UserMessage { get; set; } = string.Empty;
-}
-public class StakeholderReviewed
-{
-    public string Response { get; set; } = string.Empty;
-}
-
-public class StakeholderApprove
-{
-    public string UserName { get; set; } = string.Empty;
-    public string UserMessage { get; set; } = string.Empty;
-}
-public class StakeholderApproved
-{
-    public string Response { get; set; } = string.Empty;
 }

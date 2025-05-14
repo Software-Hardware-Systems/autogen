@@ -186,7 +186,7 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
 
             IMessage newAskMessage = (skillPersona, skillActivity) switch
             {
-                (SkillPersona.Stakeholder, StakeholderActivity.Ask) => new NewAsk { UserName = userName, UserMessage = userMessage },
+                (SkillPersona.Stakeholder, StakeholderActivity.Ask) => new StakeholderAsk { UserName = userName, UserMessage = userMessage },
                 (SkillPersona.ProductOwner, PMSkills.Readme) => new ReadmeRequested { UserName = userName, UserMessage = userMessage },
                 (SkillPersona.DeveloperLead, DeveloperLeadSkills.Plan) => new DevPlanRequested { UserName = userName, UserMessage = userMessage },
                 (SkillPersona.Developer, DeveloperSkills.Implement) => new CodeGenerationRequested {UserName = userName, UserMessage = userMessage },
