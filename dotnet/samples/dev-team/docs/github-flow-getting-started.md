@@ -118,7 +118,9 @@ The application can be run locally for development and testing.
      - `FilesAccountKey`: Storage account key.
      - `SandboxImage`: Docker image for sandbox runs.
 
-3. Expose the application to GitHub webhooks using [DevTunnels](https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/overview) or ngrok:
+3. Expose the application to GitHub webhooks using [DevTunnels](https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/overview) or ngrok or smee:
+
+    Using DevTunnels:
    ```bash
    TUNNEL_NAME=_name_your_tunnel_here_
    devtunnel user login
@@ -127,6 +129,13 @@ The application can be run locally for development and testing.
    devtunnel host $TUNNEL_NAME
    ```
    Update the GitHub App's webhook URL with the tunnel address (e.g., `https://your_tunnel_name.euw.devtunnels.ms/api/github/webhooks`).
+
+   Using smee:
+   ```powershell
+   $env:NODE_TLS_REJECT_UNAUTHORIZED=0
+   smee -u https://smee.io/_your_tunnel_name -t https://localhost:5244/api/github/webhooks
+   ```
+   Update the GitHub App's webhook URL with the tunnel address (e.g., `https://smee.io/_your_tunnel_name`).
 
 4. Run the application:
    ```bash
