@@ -136,6 +136,8 @@ public class AiAgent<T> : BaseAgent
             generationConversation,
             _chatOptions);
 
+        _logger?.LogDebug($"Response {chatResponse.Text}");
+
         ConversationState.AddGeneration(userAskMessage, chatResponse);
 
         return ConversationState.GetLastGeneration();

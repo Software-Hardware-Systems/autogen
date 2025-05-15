@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Program.cs
 
-//using System.Security.Cryptography.X509Certificates;
 using System.Diagnostics;
 using System.Security.Cryptography.X509Certificates;
 using Azure.Identity;
@@ -17,7 +16,6 @@ using Microsoft.AspNetCore.Server.Kestrel.Https;
 using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
 using Microsoft.AutoGen.Core.Grpc;
-using Microsoft.AutoGen.Extensions.SemanticKernel;
 using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.Options;
 using Octokit.Webhooks;
@@ -76,44 +74,6 @@ DevTeamServiceDefaults.AddServiceDefaults(webAppBuilder);
 // gRPC AspNetCore support is used for AutoGen agent communication infrastructure
 webAppBuilder.Services.AddGrpc();
 
-// Microsoft Extensions AI is used for chat and embedding generation
-//webAppBuilder.AddChatCompletionService("AIClientOptions");
-//webAppBuilder.AddEmbeddingGeneratorService("AIClientOptions");
-
-// Semantic Kernel is used for storing knowledge documents into VectorMemory
-webAppBuilder.ConfigureSemanticKernel();
-
-// Configure the AgentsAppBuilder to register agents with the gRPC Agent-Host.
-// This demonstrates how to register multiple agents for the sample application.
-AgentsAppBuilder agentsAppBuilder = new AgentsAppBuilder();
-agentsAppBuilder.Configuration["AGENT_HOST"] = webAppBuilder.Configuration["AGENT_HOST"];
-agentsAppBuilder.Configuration["AgentHostCert:Path"] = webAppBuilder.Configuration["AgentHostCert:Path"];
-agentsAppBuilder.Configuration["AgentHostCert:Password"] = webAppBuilder.Configuration["AgentHostCert:Password"];
-agentsAppBuilder.AddGrpcAgentWorker()
-    .AddAgent<Stakeholder>(nameof(Stakeholder))
-    .AddAgent<ProductManager>(nameof(ProductManager))
-    .AddAgent<DeveloperLead>(nameof(DeveloperLead))
-    .AddAgent<Dev>(nameof(Dev))
-    .AddAgent<AzureGenie>(nameof(AzureGenie))
-    .AddAgent<Sandbox>(nameof(Sandbox))
-    .AddAgent<Hubber>(nameof(Hubber))
-    ;
-
-agentsAppBuilder.Services.AddMemoryCache(); // Registers IMemoryCache
-agentsAppBuilder.Services.AddDistributedMemoryCache(); // Registers IDistributedCache as MemoryDistributedCache
-agentsAppBuilder.Services.AddOllamaChatClient(webAppBuilder.Configuration["AIClientOptions:LlmModelName"] ?? string.Empty);
-agentsAppBuilder.Services.AddOllamaEmbeddingGenerator(webAppBuilder.Configuration["AIClientOptions:LlmModelName"] ?? string.Empty);
-
-var agentsApp = await agentsAppBuilder.BuildAsync();
-await agentsApp.StartAsync();
-
-var agentRuntime = agentsApp.Services.GetRequiredService<IAgentRuntime>();
-webAppBuilder.Services.AddSingleton(agentRuntime);
-
-// The WebhookEventProcessor listens for GitHub webhook events and publishes messages to DevTeam agents.
-webAppBuilder.Services.AddSingleton<WebhookEventProcessor, GithubWebHookProcessor>();
-
-// Configure GitHub options and validate them on startup.
 webAppBuilder.Services.AddOptions<GithubOptions>()
     .Configure<IConfiguration>((settings, configuration) =>
     {
@@ -129,8 +89,78 @@ webAppBuilder.Services.AddOptions<GithubOptions>()
         }
     });
 
+// The WebhookEventProcessor listens for GitHub webhook events and publishes messages to DevTeam agents.
+webAppBuilder.Services.AddSingleton<WebhookEventProcessor, GithubWebHookProcessor>();
+
+// Now create the AgentsAppBuilder and register the agents that will be responding
+// to the gRPC messages published by the GitHubWebHookProcessor
+AgentsAppBuilder agentsAppBuilder = new AgentsAppBuilder();
+
+// Configure the AgentsAppBuilder to register agents with the gRPC Agent-Host.
+agentsAppBuilder.Configuration["AGENT_HOST"] = webAppBuilder.Configuration["AGENT_HOST"];
+agentsAppBuilder.Configuration["AgentHostCert:Path"] = webAppBuilder.Configuration["AgentHostCert:Path"];
+agentsAppBuilder.Configuration["AgentHostCert:Password"] = webAppBuilder.Configuration["AgentHostCert:Password"];
+
+// Propagate GithubOptions configuration values to AgentsAppBuilder
+agentsAppBuilder.Configuration["GithubOptions:AppId"] = webAppBuilder.Configuration["GithubOptions:AppId"];
+agentsAppBuilder.Configuration["GithubOptions:InstallationId"] = webAppBuilder.Configuration["GithubOptions:InstallationId"];
+agentsAppBuilder.Configuration["GithubOptions:ClientId"] = webAppBuilder.Configuration["GithubOptions:ClientId"];
+agentsAppBuilder.Configuration["GithubOptions:AppKey"] = webAppBuilder.Configuration["GithubOptions:AppKey"];
+agentsAppBuilder.Configuration["GithubOptions:WebhookSecret"] = webAppBuilder.Configuration["GithubOptions:WebhookSecret"];
+
+// Propagate AzureOptions configuration values to AgentsAppBuilder
+agentsAppBuilder.Configuration["AzureOptions:SubscriptionId"] = webAppBuilder.Configuration["AzureOptions:SubscriptionId"];
+agentsAppBuilder.Configuration["AzureOptions:Location"] = webAppBuilder.Configuration["AzureOptions:Location"];
+agentsAppBuilder.Configuration["AzureOptions:ContainerInstancesResourceGroup"] = webAppBuilder.Configuration["AzureOptions:ContainerInstancesResourceGroup"];
+agentsAppBuilder.Configuration["AzureOptions:FilesShareName"] = webAppBuilder.Configuration["AzureOptions:FilesShareName"];
+agentsAppBuilder.Configuration["AzureOptions:FilesAccountName"] = webAppBuilder.Configuration["AzureOptions:FilesAccountName"];
+agentsAppBuilder.Configuration["AzureOptions:FilesAccountKey"] = webAppBuilder.Configuration["AzureOptions:FilesAccountKey"];
+agentsAppBuilder.Configuration["AzureOptions:SandboxImage"] = webAppBuilder.Configuration["AzureOptions:SandboxImage"];
+
+agentsAppBuilder.AddGrpcAgentWorker()
+    .AddAgent<Stakeholder>(nameof(Stakeholder))
+    .AddAgent<ProductManager>(nameof(ProductManager))
+    .AddAgent<DeveloperLead>(nameof(DeveloperLead))
+    .AddAgent<Dev>(nameof(Dev))
+    .AddAgent<AzureGenie>(nameof(AzureGenie))
+    .AddAgent<Sandbox>(nameof(Sandbox))
+    .AddAgent<Hubber>(nameof(Hubber))
+    ;
+
+agentsAppBuilder.Services.AddMemoryCache(); // Registers IMemoryCache
+agentsAppBuilder.Services.AddDistributedMemoryCache(); // Registers IDistributedCache as MemoryDistributedCache
+
+// These extension methods are used to register the AI clients for chat and embedding generation services
+// for a WebAppBuilder but don't work with AgentAppBuilder
+// webAppBuilder.AddChatCompletionService("AIClientOptions");
+// webAppBuilder.AddEmbeddingGeneratorService("AIClientOptions");
+// So we register them here instead on the ServiceCollection but we lose the configuration options and validation
+// ToDo: Fix this to use the configuration options and validation
+agentsAppBuilder.Services.AddOllamaChatClient(webAppBuilder.Configuration["AIClientOptions:LlmModelName"] ?? string.Empty);
+agentsAppBuilder.Services.AddOllamaEmbeddingGenerator(webAppBuilder.Configuration["AIClientOptions:LlmModelName"] ?? string.Empty);
+
+// ToDo: Similar problem here with the Semantic Kernel as above with the Chat and Embedding services
+// Semantic Kernel is used for storing knowledge documents into VectorMemory
+//webAppBuilder.ConfigureSemanticKernel();
+
+// Configure GitHub options and validate them on startup.
+agentsAppBuilder.Services.AddOptions<GithubOptions>()
+    .Configure<IConfiguration>((settings, configuration) =>
+    {
+        configuration.GetSection("GithubOptions").Bind(settings);
+    })
+    .ValidateDataAnnotations()
+    .ValidateOnStart()
+    .PostConfigure(options =>
+    {
+        if (string.IsNullOrEmpty(options.WebhookSecret))
+        {
+            Console.WriteLine("Warning: GitHub WebhookSecret is not configured.");
+        }
+    });
+
 // The Github client is transient and used for interacting with GitHub APIs.
-webAppBuilder.Services.AddTransient(s =>
+agentsAppBuilder.Services.AddTransient(s =>
 {
     var ghOptions = s.GetRequiredService<IOptions<GithubOptions>>();
     var logger = s.GetRequiredService<ILogger<GithubAuthService>>();
@@ -139,16 +169,24 @@ webAppBuilder.Services.AddTransient(s =>
     return githubClient;
 });
 // The GithubService is a singleton and used by the agents to perform operations like creating issues, branches, and pull requests.
-webAppBuilder.Services.AddSingleton<IManageGithub, GithubService>();
+agentsAppBuilder.Services.AddSingleton<IManageGithub, GithubService>();
 
 // Configure Azure clients for interacting with Azure resources.
-webAppBuilder.Services.AddAzureClients(clientBuilder =>
+agentsAppBuilder.Services.AddAzureClients(clientBuilder =>
 {
     clientBuilder.AddArmClient(default);
     clientBuilder.UseCredential(new DefaultAzureCredential());
 });
 // The AzureService is a singleton and used by the agents to perform operations like storing code or documents in Azure Blob Storage and running code in a sandbox environment.
-webAppBuilder.Services.AddSingleton<IManageAzure, AzureService>();
+agentsAppBuilder.Services.AddSingleton<IManageAzure, AzureService>();
+
+var agentsApp = await agentsAppBuilder.BuildAsync();
+await agentsApp.StartAsync();
+
+// Register the AgentsApp as a singleton service in the web application builder.
+// This allows the web application (GithubWebhookProcessor) to access the agents and their services.
+var agentRuntime = agentsApp.Services.GetRequiredService<IAgentRuntime>();
+webAppBuilder.Services.AddSingleton(agentRuntime);
 
 // Build the application.
 var webApp = webAppBuilder.Build();

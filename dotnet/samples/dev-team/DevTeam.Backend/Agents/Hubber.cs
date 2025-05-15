@@ -61,10 +61,10 @@ public class Hubber(
         await ghService.PostComment(org, repo, issueNumber, $" - #{devLeadIssue} - tracks {SkillPersona.DeveloperLead}.{nameof(DeveloperLeadSkills.Plan)}");
     }
 
-    public async ValueTask HandleAsync(StakeholderAnswered stakeholderAnswer, MessageContext messageContext)
+    public async ValueTask HandleAsync(StakeholderAnswered stakeholderAnswered, MessageContext messageContext)
     {
         var (org, repo, issueNumber, _) = ExtractDetailsFromTopicSource(messageContext.Topic);
-        await ghService.PostComment(org, repo, issueNumber, stakeholderAnswer.Response);
+        await ghService.PostComment(org, repo, issueNumber, stakeholderAnswered.Response);
     }
 
     /// <summary>
