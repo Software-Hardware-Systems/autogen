@@ -15,6 +15,20 @@ using Octokit.Webhooks.Models;
 
 namespace DevTeam.Backend.Services;
 
+/// <summary>
+/// Extension to define stakeholder-specific label types
+/// </summary>
+public static class StakeholderSkills
+{
+    public const string Clarify = "Clarify";
+    public const string Answer = "Answer";
+    public const string Review = "Review";  
+    public const string Approve = "Approve";
+    public const string ValueProposition = "ValueProposition";
+    public const string Prioritization = "Prioritization";
+    public const string SprintFeedback = "SprintFeedback";
+}
+
 public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logger, IAgentRuntime agentRuntime) : WebhookEventProcessor
 {
     private readonly ILogger<GithubWebHookProcessor> _logger = logger;
@@ -32,11 +46,9 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
             var repo = issuesEvent.Repository?.Name ?? throw new InvalidOperationException("Repository name is null");
             var issueNumber = issuesEvent.Issue?.Number ?? throw new InvalidOperationException("Issue number is null");
             var userName = issuesEvent.Issue.User.Name ?? issuesEvent.Issue.User.Login ?? issuesEvent.Organization!.Login;
-            var userAsk = issuesEvent.Issue?.Body ?? string.Empty;
+            var issueContent = issuesEvent.Issue?.Body ?? string.Empty;
 
-            _logger.LogInformation($"{issuesEvent.Sender!.Type.Value} {userName ?? "Somebody"} {issuesEvent.Action} {org}-{repo}-{issueNumber} {string.Join(",", issuesEvent.Issue?.Labels?.Select(l => l.Name) ?? Array.Empty<string>())}");
-
-            // Note that we do process new issues even if the user is a bot
+            _logger.LogInformation($"{issuesEvent.Sender!.Type.Value} {userName ?? "Somebody"} {issuesEvent.Action} {org}-{repo}-{issueNumber} {string.Join(",", issuesEvent.Issue?.Labels?.Select(l => l.Name) ?? Array.Empty<string>())}");            // Note that we do process new issues even if the user is a bot
 
             // Assumes the label follows the following convention: Skill.Function example: PM.Readme
             // Also, we've introduced the Parent label, that ties the sub-issue with the parent issue
@@ -44,37 +56,53 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
                                     .Select(l => l.Name.Split('.'))
                                     .Where(parts => parts.Length == 2)
                                     .ToDictionary(parts => parts[0], parts => parts[1]);
-            if (labels == null || labels.Count == 0)
+            
+            string? skillType = null;
+            string? skillActivity = null;
+            
+            // Check if we have explicit labels
+            if (labels != null && labels.Count > 0)
             {
-                _logger.LogWarning("No labels found in issue. Skip processing.");
-                return;
+                // Use the first label with a Skill.Function format
+                skillType = labels.Keys.Where(k => k != "Parent").FirstOrDefault();
+                if (skillType != null)
+                {
+                    skillActivity = labels[skillType];
+                }
             }
-
-            // Use the first label with a Skill.Function format
-            var skillType = labels.Keys.Where(k => k != "Parent").FirstOrDefault();
-            if (skillType == null)
+            // If no explicit skill label was found, automatically infer it
+            if (skillType == null || skillActivity == null)
             {
-                _logger.LogWarning("No skill type found in issue. Skip processing.");
-                return;
+                _logger.LogInformation("No explicit skill label found. Using automatic skill inference.");
+                
+                // Use Stakeholder agent by default for unlabeled issues
+                skillType = SkillPersona.Stakeholder;
+                
+                // We'll determine the specific skill activity using the AI agent's inference
+                // For now, assume Clarify as default, but this will be overridden by the agent
+                skillActivity = StakeholderSkills.Clarify;
             }
 
             // Create a unique topic source which when combined
             // with a topic type based on the skillType
             // results in a unique agent instance
-            var topicSource = $"Org.{org}-Repo.{repo}-IssueNumber.{issueNumber.ToString()}";
-            long? parentIssueNumber = labels.TryGetValue("Parent", out var value) ? long.Parse(value, CultureInfo.InvariantCulture) : null;
-            if (parentIssueNumber != null)
+            var topicSource = $"Org={org}|Repo={repo}|IssueNumber={issueNumber}";
+            
+            // Only try to get parent issue number if we have labels
+            if (labels != null && labels.Count > 0 && labels.TryGetValue("Parent", out var value))
             {
-                topicSource += $"-ParentIssueNumber.{parentIssueNumber.ToString()}";
+                long? parentIssueNumber = long.Parse(value, CultureInfo.InvariantCulture);
+                topicSource += $"|ParentIssueNumber={parentIssueNumber}";
             }
 
-            if (issuesEvent.Action == IssuesAction.Opened)
+            switch (action)
             {
-                await HandleNewAsk(userName, userAsk, skillType, labels[skillType], topicSource);
-            }
-            else if (issuesEvent.Action == IssuesAction.Closed && issuesEvent.Issue?.User.Type.Value == UserType.Bot)
-            {
-                await HandleAskApproval(userName, userAsk, skillType, labels[skillType], topicSource);
+                case var ia when ia == IssuesAction.Opened:
+                    await HandleNewAsk(userName, issueContent, skillType, skillActivity, topicSource);
+                    break;
+                case var ia when ia == IssuesAction.Closed:
+                    await HandleAskApproval(userName, issueContent, skillType, skillActivity, topicSource);
+                    break;
             }
         }
         catch (Exception ex)
@@ -101,7 +129,7 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
             var userName = issueCommentEvent.Comment.User.Name ?? issueCommentEvent.Comment.User.Login ?? issueCommentEvent.Organization!.Login;
             var userComment = issueCommentEvent.Comment.Body;
 
-            _logger.LogInformation($"{issueCommentEvent.Sender!.Type.Value} {userName ?? "Somebody"} {issueCommentEvent.Action} {org}-{repo}-{issueNumber} {string.Join(",", issueCommentEvent.Issue.Labels.Select(l => l.Name))}");
+            _logger.LogInformation($"{issueCommentEvent.Sender!.Type.Value} {userName ?? "Somebody"} {action} {org}-{repo}-{issueNumber} {string.Join(",", issueCommentEvent.Issue.Labels.Select(l => l.Name))}");
 
             // We skip processing if the comment is from a bot because
             // the bot creates comments to converse with the user
@@ -112,42 +140,64 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
             }
 
             // Assumes the label follows the following convention: Skill.Function example: PM.Readme
+            // Also, we've introduced the Parent label, that ties the sub-issue with the parent issue
             var labels = issueCommentEvent.Issue.Labels
                                     .Select(l => l.Name.Split('.'))
                                     .Where(parts => parts.Length == 2)
                                     .ToDictionary(parts => parts[0], parts => parts[1]);
-            if (labels == null || labels.Count == 0)
+            
+            string? skillType = null;
+            string? skillActivity = null;
+            
+            // Check if we have explicit labels
+            if (labels != null && labels.Count > 0)
             {
-                _logger.LogWarning("No labels found in issue. Skip processing.");
-                return;
+                // Use the first label with a Skill.Function format
+                skillType = labels.Keys.Where(k => k != "Parent").FirstOrDefault();
+                if (skillType != null)
+                {
+                    skillActivity = labels[skillType];
+                }
             }
 
-            // Use the first label with a Skill.Function format
-            var skillType = labels.Keys.Where(k => k != "Parent").FirstOrDefault();
-            if (skillType == null)
+            // If no explicit skill label was found, automatically infer it
+            if (skillType == null || skillActivity == null)
             {
-                _logger.LogWarning("No skill type found in issue. Skip processing.");
-                return;
+                _logger.LogInformation("No explicit skill label found for comment event. Using automatic skill inference.");
+                
+                // Use Stakeholder agent by default for unlabeled issues
+                skillType = SkillPersona.Stakeholder;
+                
+                // We'll determine the specific skill activity using the AI agent's inference
+                // For now, assume Clarify as default, but this will be overridden by the agent
+                skillActivity = StakeholderSkills.Clarify;
             }
 
             // Create a unique topic source which when combined
             // with a topic type based on the skillType
             // results in a unique agent instance
-            var topicSource = $"Org.{org}-Repo.{repo}-IssueNumber.{issueNumber.ToString()}";
-            long? parentIssueNumber = labels.TryGetValue("Parent", out var value) ? long.Parse(value, CultureInfo.InvariantCulture) : null;
-            if (parentIssueNumber != null)
+            var topicSource = $"Org={org}|Repo={repo}|IssueNumber={issueNumber}";
+            
+            // Only try to get parent issue number if we have labels
+            // This check should use the original 'labels' dictionary from the issue
+            if (labels != null && labels.Count > 0 && labels.TryGetValue("Parent", out var value))
             {
-                topicSource += $"-ParentIssueNumber.{parentIssueNumber.ToString()}";
+                long? parentIssueNumber = long.Parse(value, CultureInfo.InvariantCulture);
+                topicSource += $"|ParentIssueNumber={parentIssueNumber}";
             }
 
-            await HandleNewAsk(userName, userComment, skillType, labels[skillType], topicSource);
+            // Currently, all non-bot comment actions (created, edited, deleted) on an issue with determinable skills
+            // will trigger HandleNewAsk. This behavior is maintained.
+            // If specific actions like only 'IssueCommentAction.Created' should be processed,
+            // a switch statement or if condition on 'action' would be needed here.
+            // For example: if (action == IssueCommentAction.Created) { ... }
+            await HandleNewAsk(userName, userComment, skillType, skillActivity, topicSource);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Processing issue comment event");
             throw;
         }
-
     }
 
     private async Task HandleAskApproval(string? userName, string userMessage, string skillPersona, string skillActivity, string topicSource)
@@ -158,9 +208,47 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
 
             IMessage askApprovalMessage = (skillPersona, skillActivity) switch
             {
-                (SkillPersona.ProductOwner, PMSkills.Readme) => new ReadmeIssueClosed { UserName = userName, UserMessage = userMessage },
-                (SkillPersona.DeveloperLead, DeveloperLeadSkills.Plan) => new DevPlanIssueClosed { UserName = userName, UserMessage = userMessage },
-                (SkillPersona.Developer, DeveloperSkills.Implement) => new CodeIssueClosed { UserName = userName, UserMessage = userMessage },
+                // Handle stakeholder approvals based on activity type
+                (SkillPersona.Stakeholder, StakeholderSkills.Clarify) => new StakeholderApprove
+                {
+                    UserName = userName,
+                    UserMessage = $"[CLARIFY_APPROVAL] {userMessage}"
+                },
+                (SkillPersona.Stakeholder, StakeholderSkills.Answer) => new StakeholderApprove
+                {
+                    UserName = userName,
+                    UserMessage = $"[ANSWER_APPROVAL] {userMessage}"
+                },
+                (SkillPersona.Stakeholder, StakeholderSkills.Review) => new StakeholderApprove
+                {
+                    UserName = userName,
+                    UserMessage = $"[REVIEW_APPROVAL] {userMessage}"
+                },
+                (SkillPersona.Stakeholder, StakeholderSkills.Approve) => new StakeholderApprove
+                {
+                    UserName = userName,
+                    UserMessage = $"[APPROVE_APPROVAL] {userMessage}"
+                },
+                (SkillPersona.Stakeholder, StakeholderSkills.ValueProposition) => new StakeholderApprove
+                {
+                    UserName = userName,
+                    UserMessage = $"[VALUE_PROPOSITION_APPROVAL] {userMessage}"
+                },
+                (SkillPersona.Stakeholder, StakeholderSkills.Prioritization) => new StakeholderApprove
+                {
+                    UserName = userName,
+                    UserMessage = $"[PRIORITIZATION_APPROVAL] {userMessage}"
+                },
+                (SkillPersona.Stakeholder, StakeholderSkills.SprintFeedback) => new StakeholderApprove
+                {
+                    UserName = userName,
+                    UserMessage = $"[SPRINT_FEEDBACK_APPROVAL] {userMessage}"
+                },
+
+                // Standard SCRUM team approvals
+                (SkillPersona.ProductOwner, nameof(PMSkills.Readme)) => new ReadmeIssueClosed { UserName = userName, UserMessage = userMessage },
+                (SkillPersona.DeveloperLead, nameof(DeveloperLeadSkills.Plan)) => new DevPlanIssueClosed { UserName = userName, UserMessage = userMessage },
+                (SkillPersona.Developer, nameof(DeveloperSkills.Implement)) => new CodeIssueClosed { UserName = userName, UserMessage = userMessage },
                 _ => new CloudEvent() // TODO: default event
                                       // There is a bug in the agent message flow
                                       // Create a new issue explaining which skillName and functionName are not handled
@@ -169,33 +257,80 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
             };
 
             await _agentRuntime.PublishMessageAsync(askApprovalMessage, new TopicId(skillPersona, topicSource));
+
+            _logger.LogDebug($"Published approval message type {askApprovalMessage.GetType().Name} to topic {skillPersona}/{topicSource}");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Handling ask approval");
             throw;
         }
-    }
-
-    private async Task HandleNewAsk(string? userName, string userMessage, string skillPersona, string skillActivity, string topicSource)
+    }    private async Task HandleNewAsk(string? userName, string userMessage, string skillPersona, string skillActivity, string topicSource)
     {
         try
         {
             _logger.LogDebug($"Handling new ask from {userName} to {skillPersona}.{skillActivity} about {topicSource}");
             _logger.LogTrace($"User message: {userMessage}");
-
+            
+            // For automatic skill inference, we'll include the original message
+            // without skill prefix and let the agent infer it internally
+            bool useInference = false;
+            
+            // If we're using the Stakeholder agent without a specific label or skill indicator
+            if (skillPersona == SkillPersona.Stakeholder && !userMessage.Contains('['))
+            {
+                _logger.LogInformation("Using automatic skill inference for unlabeled message");
+                useInference = true;
+            }
+            
+            // Handle stakeholder interactions as well as standard SCRUM team interactions
             IMessage newAskMessage = (skillPersona, skillActivity) switch
             {
-                (SkillPersona.Stakeholder, StakeholderActivity.Ask) => new StakeholderAsk { UserName = userName, UserMessage = userMessage },
-                (SkillPersona.ProductOwner, PMSkills.Readme) => new ReadmeRequested { UserName = userName, UserMessage = userMessage },
-                (SkillPersona.DeveloperLead, DeveloperLeadSkills.Plan) => new DevPlanRequested { UserName = userName, UserMessage = userMessage },
-                (SkillPersona.Developer, DeveloperSkills.Implement) => new CodeGenerationRequested {UserName = userName, UserMessage = userMessage },
-                _ => new CloudEvent()
+                // All stakeholder interactions handled with existing message types
+                // We differentiate the activity type in the UserMessage with a prefix
+                // If useInference is true, pass the message without skill prefix to allow internal inference
+                (SkillPersona.Stakeholder, StakeholderSkills.Clarify) => new StakeholderClarify { 
+                    UserName = userName, 
+                    UserMessage = useInference ? userMessage : $"[CLARIFY] {userMessage}"
+                },                (SkillPersona.Stakeholder, StakeholderSkills.Answer) => new StakeholderAnswer { 
+                    UserName = userName, 
+                    UserMessage = useInference ? userMessage : $"[ANSWER] {userMessage}"
+                },
+                (SkillPersona.Stakeholder, StakeholderSkills.Review) => new StakeholderReview { 
+                    UserName = userName, 
+                    UserMessage = useInference ? userMessage : $"[REVIEW] {userMessage}" 
+                },
+                (SkillPersona.Stakeholder, StakeholderSkills.Approve) => new StakeholderApprove { 
+                    UserName = userName, 
+                    UserMessage = useInference ? userMessage : $"[APPROVE] {userMessage}" 
+                },
+                // Enhanced stakeholder skills
+                (SkillPersona.Stakeholder, StakeholderSkills.ValueProposition) => new StakeholderValueProposition { 
+                    UserName = userName, 
+                    UserMessage = useInference ? userMessage : $"[VALUE_PROPOSITION] {userMessage}"
+                    // Feature name and business value will be extracted from the message by the Stakeholder agent
+                },
+                (SkillPersona.Stakeholder, StakeholderSkills.Prioritization) => new StakeholderPrioritization { 
+                    UserName = userName, 
+                    UserMessage = useInference ? userMessage : $"[PRIORITIZATION] {userMessage}"
+                    // Prioritized features will be extracted from the message by the Stakeholder agent
+                },
+                (SkillPersona.Stakeholder, StakeholderSkills.SprintFeedback) => new StakeholderSprintFeedback { 
+                    UserName = userName, 
+                    UserMessage = useInference ? userMessage : $"[SPRINT_FEEDBACK] {userMessage}"
+                    // Sprint ID and feature feedback will be extracted from the message by the Stakeholder agent
+                },
+                
+                // Standard SCRUM team interactions
+                (SkillPersona.ProductOwner, nameof(PMSkills.Readme)) => new ReadmeRequested { UserName = userName, UserMessage = userMessage },
+                (SkillPersona.DeveloperLead, nameof(DeveloperLeadSkills.Plan)) => new DevPlanRequested { UserName = userName, UserMessage = userMessage },
+                (SkillPersona.Developer, nameof(DeveloperSkills.Implement)) => new CodeGenerationRequested { UserName = userName, UserMessage = userMessage },
+                  _ => new CloudEvent()
                 // If the issue already exists and we are responding to a comment
                 // Reply with comment listing the available skill types and corresponding skills
             };
 
-            // skill type is used as the typic type
+            // skill type is used as the topic type
             // Agent implementations subscribe to their corresponding topic type
             await _agentRuntime.PublishMessageAsync(newAskMessage, new TopicId(skillPersona, topicSource));
         }

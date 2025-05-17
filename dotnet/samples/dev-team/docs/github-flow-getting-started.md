@@ -34,6 +34,7 @@ Before starting, ensure you have the following:
 ## Application Overview
 
 This application demonstrates how AI agents can assist in software development tasks by integrating with GitHub and Azure.
+
 1. It uses Aspire for distributed application hosting
 2. AutoGen for agent communication
 3. Qdrant as a vector database for knowledge storage
@@ -49,9 +50,10 @@ This application demonstrates how AI agents can assist in software development t
 The GitHub App is central to the workflow, enabling interaction with repository events like issues and comments.
 
 - **Why Needed**: GitHub serves as the user interface for the distributed application.
-- **How Used**:  The app listens to GitHub events (e.g., issue creation/closed and comments) which then trigger AIDevTeam workflows.
+- **How Used**: The app listens to GitHub events (e.g., issue creation/closed and comments) which then trigger AIDevTeam workflows.
 
-#### Steps:
+#### GitHub App Steps
+
 1. [Register a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app):
    - Name: Choose a descriptive name.
    - Homepage URL: Use your repository URL.
@@ -87,10 +89,11 @@ Azure resources provide infrastructure used to implement the AIDevTeam agents th
 - **Why Needed**: Azure OpenAI powers the AI agents, while Azure Storage and Container Apps host and manage the application.
 - **How Used**: The application uses Azure credentials to authenticate and interact with these resources.
 
-#### Steps:
-1. [Create an Azure OpenAI resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAi).
-2. [Create an Azure Storage Account](https://learn.microsoft.com/en-us/azure/storage/common/storage-account-overview).
-3. [Deploy Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/overview).
+#### Azure Setup Steps
+
+1. [Create an Azure OpenAI resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAi)
+2. [Create an Azure Storage Account](https://learn.microsoft.com/en-us/azure/storage/common/storage-account-overview)
+3. [Deploy Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/overview)
 
 ---
 
@@ -101,7 +104,8 @@ The application can be run locally for development and testing.
 - **Why Needed**: Local setup allows you to test the application before deploying it to Azure.
 - **How Used**: The application uses local configuration files and tools like DevTunnels or ngrok to expose endpoints.
 
-#### Steps:
+#### Local Setup Steps
+
 1. Clone the repository and open it in your IDE.
 2. Reference the `appsettings.local.template.json` and create dotnet user-secrets for each value:
    - **GitHubOptions**:
@@ -121,6 +125,7 @@ The application can be run locally for development and testing.
 3. Expose the application to GitHub webhooks using [DevTunnels](https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/overview) or ngrok or smee:
 
     Using DevTunnels:
+
    ```bash
    TUNNEL_NAME=_name_your_tunnel_here_
    devtunnel user login
@@ -128,16 +133,20 @@ The application can be run locally for development and testing.
    devtunnel port create -p 5244 $TUNNEL_NAME
    devtunnel host $TUNNEL_NAME
    ```
+
    Update the GitHub App's webhook URL with the tunnel address (e.g., `https://your_tunnel_name.euw.devtunnels.ms/api/github/webhooks`).
 
    Using smee:
+
    ```powershell
    $env:NODE_TLS_REJECT_UNAUTHORIZED=0
    smee -u https://smee.io/_your_tunnel_name -t https://localhost:5244/api/github/webhooks
    ```
+
    Update the GitHub App's webhook URL with the tunnel address (e.g., `https://smee.io/_your_tunnel_name`).
 
 4. Run the application:
+
    ```bash
    dotnet run
    ```
@@ -151,14 +160,17 @@ Qdrant is used for storing and retrieving vectorized knowledge.
 - **Why Needed**: AI agents use Qdrant to store and query embeddings for tasks like semantic search.
 - **How Used**: The application connects to Qdrant using its endpoint and API key.
 
-#### Steps:
-1. [Learn about Qdrant](https://qdrant.tech/documentation/overview/).
+#### Qdrant Setup Steps
+
+1. [Learn about Qdrant](https://qdrant.tech/documentation/overview/)
 2. Fill in the Qdrant configuration in `appsettings.json`:
+
    - `Qdrant__Endpoint`: Qdrant endpoint URL.
    - `Qdrant__ApiKey`: API key for authentication.
    - `Qdrant__VectorSize`: Size of the vector embeddings.
 
 3. Seed the database with initial data:
+
    ```bash
    dotnet run --project samples/seed-memory
    ```
@@ -172,19 +184,25 @@ Deploy the application to Azure for production use.
 - **Why Needed**: Azure provides scalability and reliability for hosting the application.
 - **How Used**: The application uses Azure Developer CLI (`azd`) for deployment.
 
-#### Steps:
-1. Install the [Azure Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/overview).
+#### Azure Deployment Steps
+
+1. Install the [Azure Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/overview)
 2. Log in to Azure:
+
    ```bash
    azd auth login
    ```
+
 3. Create a new environment and provision resources:
+
    ```bash
    ENVIRONMENT=_name_of_your_env_
    azd env new $ENVIRONMENT
    azd provision -e $ENVIRONMENT
    ```
+
 4. Retrieve the environment values:
+
    ```bash
    azd env get-values -e $ENVIRONMENT
    ```
@@ -197,8 +215,6 @@ Deploy the application to Azure for production use.
 - **OpenTelemetry**: The application uses OpenTelemetry for distributed tracing and metrics. Learn more [here](https://opentelemetry.io/docs/concepts/).
 
 By following these steps, you can configure and run the application locally or in Azure. For further details, refer to the linked documentation for each component.
-
-
 
 ### Expanded Workflow
 
@@ -214,36 +230,27 @@ By following these steps, you can configure and run the application locally or i
   - `ReadmeRequested`: Requests the generation of a README.
   - `DevPlanRequested`: Requests the generation of a development plan.
 
-    - **README Generation**:
-      1. `NewAsk` is published when a new GitHub issue is created.
-      2. `ReadmeRequested` is published to request a README.
-      3. `ReadmeGenerated` is published with the generated README.
-      4. `ReadmeIssueClosed` is published when the README is approved.
-      5. `ReadmeStored` is published when the README is stored in blob storage.
+### Workflow Details
 
-    - **Development Plan Generation**:
-      1. `DevPlanRequested` is published to request a development plan.
-      2. `DevPlanGenerated` is published with the generated plan.
-      3. `DevPlanIssueClosed` is published when the plan is approved.
-      4. `DevPlanCreated` is published to create subtasks for developers.
+- **README Generation**:
+  1. `NewAsk` is published when a new GitHub issue is created.
+  2. `ReadmeRequested` is published to request a README.
+  3. `ReadmeGenerated` is published with the generated README.
+  4. `ReadmeIssueClosed` is published when the README is approved.
+  5. `ReadmeStored` is published when the README is stored in blob storage.
 
-    - **Code Generation**:
-      1. `CodeGenerationRequested` is published to request code for a subtask.
-      2. `CodeGenerated` is published with the generated code.
-      3. `CodeIssueClosed` is published when the code is approved.
-      4. `CodeCreated` is published to store the code and schedule a sandbox run.
-      5. `SandboxRunCreated` and `SandboxRunFinished` are used to monitor and finalize the sandbox run.
+- **Development Plan Generation**:
+  1. `DevPlanRequested` is published to request a development plan.
+  2. `DevPlanGenerated` is published with the generated plan.
+  3. `DevPlanIssueClosed` is published when the plan is approved.
+  4. `DevPlanCreated` is published to create subtasks for developers.
 
-    ### GitHub Events vs. Internal Messages
-
-    - **GitHub Events**: These are external events originating from GitHub, such as:
-      - Issue created: Triggers the `NewAsk` message.
-      - Issue comment: Used to provide feedback or approve generated artifacts.
-
-    - **Internal Messages**: These are messages used for communication between agents in the DevTeam system, such as:
-      - `NewAsk`: Initiates the workflow.
-      - `ReadmeRequested`: Requests the generation of a README.
-      - `DevPlanRequested`: Requests the generation of a development plan.
+- **Code Generation**:
+  1. `CodeGenerationRequested` is published to request code for a subtask.
+  2. `CodeGenerated` is published with the generated code.
+  3. `CodeIssueClosed` is published when the code is approved.
+  4. `CodeCreated` is published to store the code and schedule a sandbox run.
+  5. `SandboxRunCreated` and `SandboxRunFinished` are used to monitor and finalize the sandbox run.
 
 ### Additional Messages
 
@@ -269,33 +276,31 @@ We use [Azure AI Services](https://learn.microsoft.com/en-us/azure/ai-services/)
 
 - First we need to [create a project in the Azure AI Foundry portal](https://learn.microsoft.com/en-us/azure/ai-foundry/how-to/create-projects?tabs=ai-studio)
 
-
-
-
-- - The Chat Completion/Inference endpoint and API keys are used to provide the intelligence, decision making, and analysis capabilities of the dev-team members. Almost any provider will work.
-    - [Sign up for an Azure account](https://azure.microsoft.com/en-us/free/)
-    - [Create an OpenAI resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAi)
-    - Once the resource is created, go to the resource and copy the API key and endpoint. You'll need these values to fill in the `appsettings.json` file.
+- The Chat Completion/Inference endpoint and API keys are used to provide the intelligence, decision making, and analysis capabilities of the dev-team members. Almost any provider will work.
+  - [Sign up for an Azure account](https://azure.microsoft.com/en-us/free/)
+  - [Create an OpenAI resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAi)
+  - Once the resource is created, go to the resource and copy the API key and endpoint. You'll need these values to fill in the `appsettings.json` file.
 
 ### How do I setup the Github app?
 
 - [Register a Github app](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app), with the options listed below:
-    - Give your App a name and add a description
-    - Homepage URL: Can be anything (Example: repository URL)
-    - Add a dummy value for the webhook url, we'll come back to this setting
-    - Enter a webhook secret, which you'll need later on when filling in the `WebhookSecret` property in the `appsettings.json` file
-    - Setup the following permissions
-        - Repository 
-            - Contents - read and write
-            - Issues - read and write
-            - Metadata - read only
-            - Pull requests - read and write
-    - Subscribe to the following events:
-        - Issues
-        - Issue comment
-    - Allow this app to be installed by any user or organization
-    
+  - Give your App a name and add a description
+  - Homepage URL: Can be anything (Example: repository URL)
+  - Add a dummy value for the webhook url, we'll come back to this setting
+  - Enter a webhook secret, which you'll need later on when filling in the `WebhookSecret` property in the `appsettings.json` file
+  - Setup the following permissions
+    - Repository
+      - Contents - read and write
+      - Issues - read and write
+      - Metadata - read only
+      - Pull requests - read and write
+  - Subscribe to the following events:
+    - Issues
+    - Issue comment
+  - Allow this app to be installed by any user or organization
+
 - [Install the Github app](https://docs.github.com/en/apps/using-github-apps/installing-your-own-github-app)
+
 - [Create labels for the dev team skills](#which-labels-should-i-create)
 
 - After the app is created, generate a private key, we'll use it later for authentication to Github from the app
@@ -305,10 +310,18 @@ We use [Azure AI Services](https://learn.microsoft.com/en-us/azure/ai-services/)
 In order for us to know which skill and persona we need to talk with, we are using Labels in Github Issues.
 
 The default bunch of skills and personnas are as follow:
+
 - PM.Readme
 - Do.It
 - DevLead.Plan
 - Developer.Implement
+- Stakeholder.Clarify
+- Stakeholder.Answer
+- Stakeholder.Review
+- Stakeholder.Approve
+- Stakeholder.ValueProposition
+- Stakeholder.Prioritization
+- Stakeholder.SprintFeedback
 
 Add them to your repository (They are not there by default).
 
@@ -316,9 +329,10 @@ Once you start adding your own skills, just remember to add the corresponding la
 
 ## How do I run this locally?
 
-Codespaces are preset for this repo. For codespaces there is a 'free' tier for individual accounts. See: https://github.com/pricing
+Codespaces are preset for this repo. For codespaces there is a 'free' tier for individual accounts. See: [GitHub Pricing](https://github.com/pricing)
+
 Start by creating a codespace:
-https://docs.github.com/en/codespaces/developing-in-a-codespace/creating-a-codespace-for-a-repository
+[Creating a Codespace for a Repository](https://docs.github.com/en/codespaces/developing-in-a-codespace/creating-a-codespace-for-a-repository)
 
 ![Alt text](./images/new-codespace.png)
 
@@ -327,21 +341,23 @@ In this sample's folder there are two files called appsettings.azure.template.js
 ### GitHubOptions
 
 For the GitHubOptions section, you'll need to fill in the following values:
+
 - **AppKey (PrivateKey)**: this is a key generated while creating a GitHub App. If you haven't saved it during creation, you'll need to generate a new one. Go to the settings of your GitHub app, scroll down to "Private keys" and click on "Generate a new private key". It will download a .pem file that contains your App Key. Then copy and paste all the **-----BEGIN RSA PRIVATE KEY---- your key -----END RSA PRIVATE KEY-----** content here, in one line.
 - **AppId**: This can be found on the same page where you created your app. Go to the settings of your GitHub app and you can see the App ID at the top of the page.
-- **InstallationId**: Access to your GitHub app installation and take note of the number (long type) at the end of the URL (which should be in the following format: https://github.com/settings/installations/installation-id).
+- **InstallationId**: Access to your GitHub app installation and take note of the number (long type) at the end of the URL (which should be in the following format: `https://github.com/settings/installations/installation-id`).
 - **WebhookSecret**: This is a value that you set when you create your app. In the app settings, go to the "Webhooks" section. Here you can find the "Secret" field where you can set your Webhook Secret.
 
 ### AzureOptions
 
 The following fields are required and need to be filled in:
+
 - **SubscriptionId**: The id of the subscription you want to work on.
-- **Location**
+- **Location**: Azure region where resources will be deployed.
 - **ContainerInstancesResourceGroup**: The name of the resource group where container instances will be deployed.
 - **FilesAccountName**: Azure Storage Account name.
 - **FilesShareName**: The name of the File Share.
 - **FilesAccountKey**: The File Account key.
-- **SandboxImage**
+- **SandboxImage**: Docker image to use for sandbox runs.
 
 In the Explorer tab in VS Code, find the Solution explorer, right click on the `gh-flow` project and click Debug -> Start new instance
 
@@ -349,29 +365,32 @@ In the Explorer tab in VS Code, find the Solution explorer, right click on the `
 
 We'll need to expose the running application to the GH App webhooks, for example using [DevTunnels](https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/overview), but any tool like ngrok can also work.
 The following commands will create a persistent tunnel, so we need to only do this once:
+
 ```bash
 TUNNEL_NAME=_name_your_tunnel_here_
 devtunnel user login
 devtunnel create -a $TUNNEL_NAME
 devtunnel port create -p 5244 $TUNNEL_NAME
 ```
+
 and once we have the tunnel created we can just start forwarding with the following command:
 
 ```bash
 devtunnel host $TUNNEL_NAME
 ```
 
-Copy the local address (it will look something like https://your_tunnel_name.euw.devtunnels.ms) and append `/api/github/webhooks` at the end. Using this value, update the Github App's webhook URL and you are ready to go!
+Copy the local address (it will look something like [`https://your_tunnel_name.euw.devtunnels.ms`](https://your_tunnel_name.euw.devtunnels.ms)) and append `/api/github/webhooks` at the end. Using this value, update the Github App's webhook URL and you are ready to go!
 
 Before you go and have the best of times, there is one last thing left to do [load the WAF into the vector DB](#load-the-waf-into-qdrant)
 
-Also, since this project is relying on Orleans for the Agents implementation, there is a [dashboard](https://github.com/OrleansContrib/OrleansDashboard) available at https://yout_tunnel_name.euw.devtunnels.ms/dashboard, with useful metrics and stats related to the running Agents.
+Also, since this project is relying on Orleans for the Agents implementation, there is a [dashboard](https://github.com/OrleansContrib/OrleansDashboard) available at [dashboard](https://yout_tunnel_name.euw.devtunnels.ms/dashboard), with useful metrics and stats related to the running Agents.
 
 ## How do I deploy the azure bits?
 
 This sample is setup to use  [azd](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/overview) to work with the Azure bits. `azd` is installed in the codespace.
 
 Let's start by logging in to Azure using
+
 ```bash
 azd auth login
 ```
@@ -383,27 +402,24 @@ ENVIRONMENT=_name_of_your_env
 azd env new $ENVIRONMENT
 azd provision -e $ENVIRONMENT
 ```
-After the provisioning is done, you can inspect the outputs with the following command
+
+After the provisioning is done, you can inspect the outputs with the following command:
 
 ```bash
 azd env get-values -e dev
 ```
+
 As the last step, we also need to [load the WAF into the vector DB](#load-the-waf-into-qdrant)
 
-### Load the WAF into Qdrant. 
+### Load the WAF into Qdrant
 
 If you are running the app locally, we have [Qdrant](https://qdrant.tech/) setup in the Codespace and if you are running in Azure, Qdrant is deployed to ACA.
 The loader is a project in the `samples` folder, called `seed-memory`. We need to fill in the `appsettings.json` (after renaming `appsettings.template.json` in `appsettings.json`) file in the `config` folder with the OpenAI details and the Qdrant endpoint, then just run the loader with `dotnet run` and you are ready to go.
 
-
-
 ### WIP Local setup
 
-```
+```bash
 dotnet user-secrets set "ServerCert:Password" "your_devcert_password"
-
-
-
 dotnet user-secrets set "OpenAI:Key" "your_key"
 
 dotnet user-secrets set "OpenAI:Endpoint" "https://your_endpoint.openai.azure.com/"
@@ -416,3 +432,39 @@ dotnet user-secrets set "Github:WebhookSecret" "webhook_secret"
 
 dotnet user-secrets set "Github:AppKey" "gh_app_key"
 ```
+
+### Stakeholder Agent Workflow
+
+The Stakeholder agent serves as a bridge between external stakeholders and the SCRUM team's Product Owner. This agent helps translate business goals into actionable requirements and SCRUM artifacts.
+
+#### Stakeholder Skills
+
+The Stakeholder agent provides the following skills, which can be accessed using corresponding GitHub issue labels:
+
+1. **Basic Skills**:
+   - `Stakeholder.Clarify`: Helps clarify business requirements and intent.
+   - `Stakeholder.Answer`: Provides answers to stakeholder questions.
+   - `Stakeholder.Review`: Assists in reviewing deliverables from a business perspective.
+   - `Stakeholder.Approve`: Processes stakeholder approvals.
+
+2. **Enhanced Skills**:
+   - `Stakeholder.ValueProposition`: Helps articulate business value propositions for features.
+   - `Stakeholder.Prioritization`: Assists with feature prioritization based on business value.
+   - `Stakeholder.SprintFeedback`: Facilitates structured feedback on sprint results.
+
+#### Workflow Example
+
+1. A stakeholder creates an issue with the `Stakeholder.ValueProposition` label to articulate the business value of a new feature.
+2. The Stakeholder agent processes the request and responds with a structured value proposition.
+3. The stakeholder iterates with the agent through comments until the value proposition is refined.
+4. Once refined (by closing the issue), the value proposition is shared with the Product Owner for backlog prioritization.
+
+#### Implementation
+
+The Stakeholder agent implementation:
+
+- Maintains state to track business priorities, value propositions, and feedback history
+- Uses AI to extract structured information from natural language inputs
+- Translates stakeholder inputs into formats compatible with SCRUM artifacts
+- Provides context-aware responses based on previous interactions
+- Integrates with the rest of the DevTeam workflow through message passing

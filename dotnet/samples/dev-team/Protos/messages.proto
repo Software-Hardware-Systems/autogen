@@ -23,46 +23,30 @@ option csharp_namespace = "DevTeam";
 
 // Stakeholder Activity Messages
 
-// Message published when a stakeholder asks a question or makes a request.
-message StakeholderAsk {
+// Message published when a stakeholder creates a request.
+message StakeholderRequest {
   // The user's name
   string user_name = 1;
   // The user's natural language request or description of the task.
   string user_message = 2;
+  // The type of request (feature, feedback, question, etc.)
+  string request_type = 3;
+  // The priority of the request (high, medium, low)
+  string priority = 4;
+  // Additional context for the request
+  string context = 5;
 }
 
-// Message published in response to a StakeholderAsk.
-message StakeholderAsked {
-  // The response to the stakeholder's ask.
+// Message published in response to a StakeholderApprove.
+message ResponseToStakeholder {
+  // The response to the stakeholder request
   string response = 1;
-}
-
-// Message published when a stakeholder provides an answer.
-message StakeholderAnswer {
-  // The user's name
-  string user_name = 1;
-  // The user's answer or message.
-  string user_message = 2;
-}
-
-// Message published in response to a StakeholderAnswer.
-message StakeholderAnswered {
-  // The response to the stakeholder's answer.
-  string response = 1;
-}
-
-// Message published when a stakeholder submits a review.
-message StakeholderReview {
-  // The user's name
-  string user_name = 1;
-  // The user's review message.
-  string user_message = 2;
-}
-
-// Message published in response to a StakeholderReview.
-message StakeholderReviewed {
-  // The response to the stakeholder's review.
-  string response = 1;
+  // The action taken in response to the approval
+  string action_taken = 2;
+  // Next steps in the process
+  repeated string next_steps = 3;
+  // Suggestion for the next interaction
+  string next_interaction_suggestion = 4;
 }
 
 // Message published when a stakeholder approves something.
@@ -71,12 +55,200 @@ message StakeholderApprove {
   string user_name = 1;
   // The user's approval message.
   string user_message = 2;
+  // The specific item being approved
+  string item_approved = 3;
+  // Whether the approval includes change requests
+  bool with_changes = 4;
+  // Specific changes requested as part of the approval
+  repeated string change_requests = 5;
 }
 
-// Message published in response to a StakeholderApprove.
-message StakeholderApproved {
-  // The response to the stakeholder's approval.
+// Message published when a stakeholder asks for clarification.
+message StakeholderClarify {
+  // The user's name
+  string user_name = 1;
+  // The user's clarification request message.
+  string user_message = 2;
+  // Additional context for understanding the request
+  string context = 3;
+  // Project information
+  string project = 4;
+  // Additional knowledge relevant to the clarification
+  string knowledge = 5;
+}
+
+// Message published in response to a StakeholderClarify.
+message StakeholderClarified {
+  // The response to the stakeholder's ask.
   string response = 1;
+  // Specific clarification questions
+  repeated string clarification_questions = 2;
+  // The AI's understanding of the request
+  string understanding = 3;
+  // Identified missing aspects in the request
+  repeated string missing_aspects = 4;
+}
+
+// Message published when a stakeholder provides an answer.
+message StakeholderAnswer {
+  // The user's name
+  string user_name = 1;
+  // The user's answer or message.
+  string user_message = 2;
+  // Reference to the original question
+  string question_reference = 3;
+  // Context for the answer
+  string context = 4;
+}
+
+// Message published in response to a StakeholderAnswer.
+message StakeholderAnswered {
+  // The response to the stakeholder's answer.
+  string response = 1;
+  // Whether the answer requires follow-up
+  bool requires_follow_up = 2;
+  // Follow-up question if needed
+  string follow_up_question = 3;
+  // Status of the answer processing
+  string status = 4;
+}
+
+// Message published when a stakeholder reviews something.
+message StakeholderReview {
+  // The user's name
+  string user_name = 1;
+  // The user's review message.
+  string user_message = 2;
+  // The specific item being reviewed
+  string item_reviewed = 3;
+  // Context for the review
+  string review_context = 4;
+  // Specific areas to focus on in the review
+  string specific_focus_areas = 5;
+}
+
+// Message published in response to a StakeholderReview.
+message StakeholderReviewed {
+  // The response to the stakeholder's review.
+  string response = 1;
+  // Whether the item is approved after review
+  bool approved = 2;
+  // Changes requested as part of the review
+  repeated string changes_requested = 3;
+  // Next steps after the review
+  string next_steps = 4;
+}
+
+// Enhanced stakeholder message types
+
+// Message published when a stakeholder provides a value proposition.
+message StakeholderValueProposition {
+  // The user's name
+  string user_name = 1;
+  // The user's message containing value proposition information
+  string user_message = 2;
+  // The name of the feature
+  string feature_name = 3;
+  // The customer segment targeted by this feature
+  string customer_segment = 4;
+  // Feature description
+  string description = 5;
+  // Expected business benefits
+  repeated string expected_benefits = 6;
+}
+
+// Message published in response to a StakeholderValueProposition.
+message ValuePropositionProcessed {
+  // The response to the stakeholder's value proposition
+  string response = 1;
+  // Formalized value proposition statement
+  string formalized_value_proposition = 2;
+  // User stories derived from the value proposition
+  repeated string related_user_stories = 3;
+  // Suggested metrics to track success
+  repeated string suggested_metrics = 4;
+  // Next steps in the process
+  string next_steps = 5;
+}
+
+// Message published when a stakeholder provides feature prioritization.
+message StakeholderPrioritization {
+  // The user's name
+  string user_name = 1;
+  // The user's message containing prioritization information
+  string user_message = 2;
+  // Context for the prioritization
+  string prioritization_context = 3;
+  // Timeline constraints
+  string timeline_constraints = 4;
+  // Features to prioritize
+  repeated PrioritizedFeature features = 5;
+  
+  // Nested message for feature prioritization details
+  message PrioritizedFeature {
+    // Feature name
+    string feature_name = 1;
+    // Relative priority (1 is highest)
+    int32 relative_priority = 2;
+    // Business value (1-10)
+    int32 business_value = 3;
+    // Justification for the priority
+    string justification = 4;
+  }
+}
+
+// Message published in response to a StakeholderPrioritization.
+message PrioritizationProcessed {
+  // The response to the stakeholder's prioritization
+  string response = 1;
+  // Summary of the updated backlog
+  string updated_backlog_summary = 2;
+  // Impact on timeline
+  repeated string impact_on_timeline = 3;
+  // Potential conflicts or issues
+  repeated string potential_conflicts = 4;
+  // Recommendation for next steps
+  string recommendation = 5;
+}
+
+// Message published when a stakeholder provides sprint feedback.
+message StakeholderSprintFeedback {
+  // The user's name
+  string user_name = 1;
+  // The user's message containing sprint feedback
+  string user_message = 2;
+  // Sprint identifier
+  string sprint_id = 3;
+  // Overall assessment of the sprint
+  string overall_assessment = 4;
+  // Features completed in the sprint
+  repeated CompletedFeature completed_features = 5;
+  
+  // Nested message for completed feature feedback
+  message CompletedFeature {
+    // Feature name
+    string feature_name = 1;
+    // Whether the feature meets expectations
+    bool meets_expectations = 2;
+    // Specific feedback on the feature
+    string specific_feedback = 3;
+    // Suggested improvements
+    repeated string suggested_improvements = 4;
+  }
+}
+
+// Message published in response to a StakeholderSprintFeedback.
+message SprintFeedbackProcessed {
+  // The response to the stakeholder's sprint feedback
+  string response = 1;
+  // Summary of the feedback
+  string feedback_summary = 2;
+  // Actionable items derived from the feedback
+  repeated string actionable_items = 3;
+  // Implications for the backlog
+  repeated string backlog_implications = 4;
+  // Recommendations for the next sprint
+  string next_sprint_recommendations = 5;
 }
 
 // ReadmeRequested Message: Published whenever a GitHub issue, assigned to the Program Manager, is created or commentted on.

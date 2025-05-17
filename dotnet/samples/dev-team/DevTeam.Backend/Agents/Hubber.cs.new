@@ -2,9 +2,11 @@
 // Hubber.cs
 
 using System.Text.Json;
+using DevTeam;
 using DevTeam.Backend.Agents.DeveloperLead;
 using DevTeam.Backend.Agents.ProductManager;
 using DevTeam.Backend.Services;
+using DevTeam.Backend.Messages;
 using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
 
@@ -26,8 +28,8 @@ public class Hubber(
     ILogger<Hubber>? logger = null)
     :
     BaseAgent(id, runtime, nameof(Hubber), logger),
-    IHandle<StakeholderRequest>,
-    IHandle<ResponseToStakeholder>,
+    IHandle<StakeholderAsked>,
+    IHandle<StakeholderAnswered>,
     IHandle<ReadmeGenerated>,
     IHandle<DevPlanGenerated>,
     IHandle<DevPlanCreated>,
@@ -36,10 +38,13 @@ public class Hubber(
     // Additional stakeholder message handlers
     IHandle<StakeholderClarified>,
     IHandle<StakeholderReviewed>,
+    IHandle<ResponseToStakeholder>,
     IHandle<ValuePropositionProcessed>,
-    IHandle<PrioritizationProcessed>
-{    /// <summary>
-    /// When the user creates a new Issue (StakeholderRequest), create two new issues:
+    IHandle<PrioritizationProcessed>,
+    IHandle<SprintFeedbackProcessed>
+{
+    /// <summary>
+    /// When the user creates a new Issue (StakeholderAsk), create two new issues:
     /// One for the PM to create a README.md file
     /// Another for the DevLead to create a plan
     /// Then create a new branch for the dev-team to work on
@@ -47,21 +52,34 @@ public class Hubber(
     /// The comments contain magic strings PM.Readme and DevLead.Plan to
     /// indicate which dev-team agent should handle the issue
     /// </summary>
-    /// <param name="stakeholderRequest"></param>
+    /// <param name="stakeholderAsk"></param>
     /// <param name="messageContext"></param>
     /// <returns></returns>
-    public async ValueTask HandleAsync(StakeholderRequest stakeholderRequest, MessageContext messageContext)
+    public async ValueTask HandleAsync(StakeholderAsked stakeholderAsk, MessageContext messageContext)
     {
         var (org, repo, issueNumber, _) = ExtractDetailsFromTopicSource(messageContext.Topic);
 
         await ghService.CreateBranch(org, repo, $"sk-{issueNumber}");
 
         // Note that the newAsk user message is incorporated into both the PM and DevLead issues
-        var pmIssue = await ghService.CreateIssue(org, repo, stakeholderRequest.ToString(), $"{SkillPersona.ProductOwner}.{nameof(PMSkills.Readme)}", issueNumber);
+
+        var pmIssue = await ghService.CreateIssue(org, repo, stakeholderAsk.Response, $"{SkillPersona.ProductOwner}.{nameof(PMSkills.Readme)}", issueNumber);
         await ghService.PostComment(org, repo, issueNumber, $" - #{pmIssue} - tracks {SkillPersona.ProductOwner}.{nameof(PMSkills.Readme)}");
 
-        var devLeadIssue = await ghService.CreateIssue(org, repo, stakeholderRequest.ToString(), $"{SkillPersona.DeveloperLead}.{nameof(DeveloperLeadSkills.Plan)}", issueNumber);
+        var devLeadIssue = await ghService.CreateIssue(org, repo, stakeholderAsk.Response, $"{SkillPersona.DeveloperLead}.{nameof(DeveloperLeadSkills.Plan)}", issueNumber);
         await ghService.PostComment(org, repo, issueNumber, $" - #{devLeadIssue} - tracks {SkillPersona.DeveloperLead}.{nameof(DeveloperLeadSkills.Plan)}");
+    }
+
+    public async ValueTask HandleAsync(StakeholderAnswered stakeholderAnswered, MessageContext messageContext)
+    {
+        var (org, repo, issueNumber, _) = ExtractDetailsFromTopicSource(messageContext.Topic);
+        await ghService.PostComment(org, repo, issueNumber, stakeholderAnswered.Response);
+        
+        // Add follow-up question if needed
+        if (stakeholderAnswered.RequiresFollowUp && !string.IsNullOrEmpty(stakeholderAnswered.FollowUpQuestion))
+        {
+            await ghService.PostComment(org, repo, issueNumber, $"Follow-up question: {stakeholderAnswered.FollowUpQuestion}");
+        }
     }
     
     public async ValueTask HandleAsync(StakeholderClarified stakeholderClarified, MessageContext messageContext)
@@ -69,7 +87,7 @@ public class Hubber(
         var (org, repo, issueNumber, _) = ExtractDetailsFromTopicSource(messageContext.Topic);
         
         // Post the main response
-        await ghService.PostComment(org, repo, issueNumber, stakeholderClarified.ToString());
+        await ghService.PostComment(org, repo, issueNumber, stakeholderClarified.Response);
         
         // Post understanding and questions if needed
         if (!string.IsNullOrEmpty(stakeholderClarified.Understanding))
@@ -95,7 +113,7 @@ public class Hubber(
         var (org, repo, issueNumber, _) = ExtractDetailsFromTopicSource(messageContext.Topic);
         
         // Post the main response
-        await ghService.PostComment(org, repo, issueNumber, stakeholderReviewed.ToString());
+        await ghService.PostComment(org, repo, issueNumber, stakeholderReviewed.Response);
         
         // Add review status
         var status = stakeholderReviewed.Approved ? "✅ **Approved**" : "❌ **Not Approved**";
@@ -114,12 +132,13 @@ public class Hubber(
             await ghService.PostComment(org, repo, issueNumber, $"Next steps: {stakeholderReviewed.NextSteps}");
         }
     }
-      public async ValueTask HandleAsync(ResponseToStakeholder responseToStakeholder, MessageContext messageContext)
+    
+    public async ValueTask HandleAsync(ResponseToStakeholder responseToStakeholder, MessageContext messageContext)
     {
         var (org, repo, issueNumber, _) = ExtractDetailsFromTopicSource(messageContext.Topic);
         
         // Post the main response
-        await ghService.PostComment(org, repo, issueNumber, responseToStakeholder.ToString());
+        await ghService.PostComment(org, repo, issueNumber, responseToStakeholder.Response);
         
         // Post action taken
         if (!string.IsNullOrEmpty(responseToStakeholder.ActionTaken))
@@ -146,7 +165,7 @@ public class Hubber(
         var (org, repo, issueNumber, _) = ExtractDetailsFromTopicSource(messageContext.Topic);
         
         // Post the main response
-        await ghService.PostComment(org, repo, issueNumber, valuePropositionProcessed.ToString());
+        await ghService.PostComment(org, repo, issueNumber, valuePropositionProcessed.Response);
         
         // Post formalized value proposition
         if (!string.IsNullOrEmpty(valuePropositionProcessed.FormalizedValueProposition))
@@ -180,7 +199,7 @@ public class Hubber(
         var (org, repo, issueNumber, _) = ExtractDetailsFromTopicSource(messageContext.Topic);
         
         // Post the main response
-        await ghService.PostComment(org, repo, issueNumber, prioritizationProcessed.ToString());
+        await ghService.PostComment(org, repo, issueNumber, prioritizationProcessed.Response);
         
         // Post backlog summary
         if (!string.IsNullOrEmpty(prioritizationProcessed.UpdatedBacklogSummary))
@@ -214,7 +233,7 @@ public class Hubber(
         var (org, repo, issueNumber, _) = ExtractDetailsFromTopicSource(messageContext.Topic);
         
         // Post the main response
-        await ghService.PostComment(org, repo, issueNumber, sprintFeedbackProcessed.ToString());
+        await ghService.PostComment(org, repo, issueNumber, sprintFeedbackProcessed.Response);
         
         // Post feedback summary
         if (!string.IsNullOrEmpty(sprintFeedbackProcessed.FeedbackSummary))

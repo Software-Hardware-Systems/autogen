@@ -26,7 +26,7 @@ public class AiAgent<T> : BaseAgent
         //_embeddingGenerator = embeddingGenerator;
         //_vectorStore = vectorStore;
         _chatClient = chatClient;
-        _chatOptions = new() { Tools = [AIFunctionFactory.Create(RetrieveAdditionalKnowledge)] };
+        _chatOptions = new() { Tools = [AIFunctionFactory.Create(RetrieveAdditionalKnowledge), AIFunctionFactory.Create(ClassifySkill)] };
     }
 
     //private IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
@@ -35,6 +35,11 @@ public class AiAgent<T> : BaseAgent
     private ChatOptions _chatOptions;
 
     protected AiAgentConversationState ConversationState { get; } = new();
+
+    /// <summary>
+    /// Dictionary of available skills for the agent. Can be overridden by derived classes.
+    /// </summary>
+    protected virtual Dictionary<string, string> AvailableSkills => new();
 
     /// <summary>
     /// Represents the state of an AI agent instance, including a list of chat messages, knowledge instructions, and
@@ -114,10 +119,76 @@ public class AiAgent<T> : BaseAgent
     [Description("Retrieves additional knowledge based on the provided input from a specified collection")]
     private async Task<string> RetrieveAdditionalKnowledge(string knowledgeCollection, string input, int limit = 5)
     {
-        return string.Empty;
+        return "No additional knowledge is available";
     }
 
-    protected async Task<string> GenerateResponseUsing(string agentPrompt, string UserName, string userAsk)
+    /// <summary>
+    /// Classifies a user message into an appropriate skill type for agent response
+    /// </summary>
+    /// <param name="message">The user message to classify</param>
+    /// <returns>The skill type that best matches the user's intent</returns>
+    [Description("Determines the appropriate skill based on the content of the user message")]
+    private async Task<string> ClassifySkill(string message)
+    {
+        if (AvailableSkills.Count == 0)
+        {
+            return "Unknown";
+        }
+
+        // Check for explicit skill indicators in the message
+        // (e.g., "[CLARIFY]", "[REVIEW]", etc.)
+        foreach (var skill in AvailableSkills)
+        {
+            if (message.Contains($"[{skill.Key}]", StringComparison.OrdinalIgnoreCase))
+            {
+                return skill.Key;
+            }
+        }
+
+        // Prepare a prompt for the LLM to classify the skill
+        string skillClassificationPrompt = $@"
+Classify the following message into one of these skill types: {string.Join(", ", AvailableSkills.Keys)}.
+
+For reference, here's what each skill type is for:
+{string.Join("\n", AvailableSkills.Select(s => $"- {s.Key}: {s.Value}"))}
+
+Analyze the user's intent and respond with just the name of the most appropriate skill type.
+Message to classify: {message}
+
+The skill type is:";
+
+        ChatMessage systemMessage = new ChatMessage(ChatRole.System, skillClassificationPrompt);
+        List<ChatMessage> messages = [systemMessage];
+        
+        _logger?.LogDebug("Classifying skill for message: {MessagePreview}", message.Length > 50 ? string.Concat(message.AsSpan(0, 50), "...") : message);
+        
+        ChatResponse response = await _chatClient.GetResponseAsync(messages, new ChatOptions { Temperature = 0.0f });
+        
+        string skillType = response.Text.Trim();
+        
+        // Validate that the returned skill is in our available skills
+        if (!AvailableSkills.ContainsKey(skillType))
+        {
+            _logger?.LogWarning("Skill classification returned unknown skill: {Skill}. Using default.", skillType);
+            // Return the first skill as default
+            return AvailableSkills.Keys.FirstOrDefault() ?? "Unknown";
+        }
+        
+        _logger?.LogInformation("Message classified as skill type: {SkillType}", skillType);
+        return skillType;
+    }
+
+    /// <summary>
+    /// Infers the appropriate skill based on the content of a message
+    /// </summary>
+    /// <param name="message">The message content to analyze</param>
+    /// <returns>The inferred skill type</returns>
+    public async Task<string> InferSkillFromMessage(string message)
+    {
+        return await ClassifySkill(message);
+    }
+
+    protected async Task<string> GenerateResponseUsing(string agentPrompt, string userName, string userAsk)
     {
         ChatMessage systemChatMessage = new ChatMessage(ChatRole.System, agentPrompt);
         systemChatMessage.AuthorName = Description;
@@ -128,7 +199,7 @@ public class AiAgent<T> : BaseAgent
         }
 
         ChatMessage userAskMessage = new ChatMessage(ChatRole.User, userAsk);
-        userAskMessage.AuthorName = UserName;
+        userAskMessage.AuthorName = userName;
 
         List<ChatMessage> generationConversation = [systemChatMessage, .. ConversationState.UserAsks];
 

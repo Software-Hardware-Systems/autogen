@@ -1,7 +1,7 @@
 # GitHub Dev Team with AI Agents
 
 This project is a **demonstration application** that serves as a starting point for further customization and development.
-It showcases how to integrate AI and programmatic agents into a distributed application utilizing existing external resources. 
+It showcases how to integrate AI and programmatic agents into a distributed application utilizing existing external resources.
 
 The application leverages GitHub's existing user interface and infrastructure of **events** and **webhooks** to connect with the DevTeam application.
 Azure blob storage is used to store intermediate artificts, such as READMEs and code files, while the **Azure Genie** service is used to run the code in a sandbox environment.
@@ -21,6 +21,7 @@ This is very similar to how traditional development teams interact, where issues
 GitHub's design reflects these traditional workflows, making it an ideal interface for this demonstration.
 
 The intent is to enable users to interact with the DevTeam agents in a way that feels natural and intuitive, just as they would with a human development team. From a natural language specification, users can initiate tasks such as:
+
 - Writing unit tests
 - Expanding pipelines
 - Creating pull requests for specific intents
@@ -29,6 +30,7 @@ The intent is to enable users to interact with the DevTeam agents in a way that 
 
 The system supports **chain-of-thought coordination**, allowing agents to collaborate across multiple reasoning trees to achieve the user's goals.
 Each agent specializes in a specific aspect of the development process, such as:
+
 - Architecture and task breakdown
 - Development planning
 - Code generation and review
@@ -45,7 +47,7 @@ Check [the getting started guide](./docs/github-flow-getting-started.md).
 
 ## Demo
 
-https://github.com/microsoft/azure-openai-dev-skills-orchestrator/assets/10728102/cafb1546-69ab-4c27-aaf5-1968313d637f
+[Demo Video](https://github.com/microsoft/azure-openai-dev-skills-orchestrator/assets/10728102/cafb1546-69ab-4c27-aaf5-1968313d637f)
 
 ## Solution overview
 
@@ -88,22 +90,39 @@ The workflow is as follows:
 - **ProductManager**: Generates READMEs based on user input.
 - **DeveloperLead**: Creates development plans and assigns subtasks to developers.
 - **Developer**: Generates code for specific subtasks.
+- **Stakeholder**: Acts as a bridge between human stakeholders and the SCRUM team's Product Owner, translating business goals into actionable requirements and SCRUM artifacts.
 
-* * User begins with creating an issue and then stateing what they want to accomplish, natural language, as simple or as detailed as needed.
-* Product manager agent will respond with a Readme, which can be iterated upon.
-  * User approves the readme or gives feedback via issue comments.
-  * Once the readme is approved, the user closes the issue and the Readme is commited to a PR.
-* Developer lead agent responds with a decomposed plan for development, which also can be iterated upon.
-  * User approves the plan or gives feedback via issue comments.
-  * Once the plan is approved, the user closes the issue and the plan is used to break down the task to different developer agents.
-* Developer agents respond with code, which can be iterated upon.
-  * User approves the code or gives feedback via issue comments.
-  * Once the code is approved, the user closes the issue and the code is commited to a PR.
+The workflow typically follows these steps:
+
+- User begins with creating an issue and then stating what they want to accomplish, using natural language as simple or as detailed as needed.
+- If business requirements need clarification, the Stakeholder agent can assist:
+  - The Stakeholder agent processes requests using labels like `Stakeholder.ValueProposition`, `Stakeholder.Prioritization`, etc.
+  - User iterates with the stakeholder agent to refine business requirements through issue comments.
+  - Once refined, stakeholder insights are provided to the Product Owner for backlog management.
+- Product manager agent will respond with a Readme, which can be iterated upon.
+  - User approves the readme or gives feedback via issue comments.
+  - Once the readme is approved, the user closes the issue and the Readme is committed to a PR.
+- Developer lead agent responds with a decomposed plan for development, which also can be iterated upon.
+  - User approves the plan or gives feedback via issue comments.
+  - Once the plan is approved, the user closes the issue and the plan is used to break down the task to different developer agents.
+- Developer agents respond with code, which can be iterated upon.
+  - User approves the code or gives feedback via issue comments.
+  - Once the code is approved, the user closes the issue and the code is committed to a PR.
 
 ```mermaid
 graph TD;
     NEA([NewAsk event]) -->|Hubber| NEA1[Creation of PM issue, DevLead issue, and new branch];
     
+    %% Stakeholder workflow
+    NEA1 -->|If business requirements need clarification| SIR([StakeholderRequest event])
+    SIR -->|Stakeholder| SIA[Process stakeholder inputs: ValueProposition, Prioritization, etc.];
+    SIA --> SIG([StakeholderProcessed events]);
+    SIG -->|Hubber| SIGH[Post stakeholder response as a comment on the issue];
+    SIGH --> SIGC([StakeholderIssueClosed event]);
+    SIGC -->|Stakeholder| SIGCE([StakeholderValueAccepted event]);
+    SIGCE -->|ProductOwner| SIGPO[Update product backlog with stakeholder insights];
+    
+    %% Readme workflow
     RR([ReadmeRequested event]) -->|ProductManager| PM1[Generation of new README];
     NEA1 --> RR;
     PM1 --> RG([ReadmeGenerated event]);
@@ -114,6 +133,7 @@ graph TD;
     RES --> RES2([ReadmeStored event]);
     RES2 --> |Hubber| REC[Readme commited to branch and create new PR];
 
+    %% Development plan workflow
     DPR([DevPlanRequested event]) -->|DeveloperLead| DPG[Generation of new development plan];
     NEA1 --> DPR;
     DPG --> DPGE([DevPlanGenerated event]);
@@ -122,7 +142,9 @@ graph TD;
     DPCC -->|DeveloperLead| DPCE([DevPlanCreated event]);
     DPCE --> |Hubber| DPC[Creates a Dev issue for each subtask];
 
-    DPC([CodeGenerationRequested event]) -->|Developer| CG[Generation of new code];
+    %% Code generation workflow
+    DPC -->|For each subtask| DPC2([CodeGenerationRequested event]);
+    DPC2 -->|Developer| CG[Generation of new code];
     CG --> CGE([CodeGenerated event]);
     CGE -->|Hubber| CGC[Posting the code as a new comment on the issue];
     CGC --> CCCE([CodeIssueClosed event]);
@@ -133,3 +155,62 @@ graph TD;
     SRM --> SRF([SandboxRunFinished event]);
     SRF --> |Hubber| SRCC[Code files commited to branch];
 ```
+
+---
+
+## Stakeholder Integration
+
+The DevTeam application includes a Stakeholder agent that serves as a bridge between external business stakeholders and the SCRUM team's Product Owner. This implementation demonstrates how AI agents can facilitate better communication between business and development teams.
+
+### Stakeholder Agent Architecture
+
+The Stakeholder agent:
+
+1. **Message Processing**: Receives and processes messages from GitHub issues tagged with Stakeholder-specific labels.
+2. **State Management**: Maintains state information about business priorities, value propositions, feature priorities, feedback history, and business metrics.
+3. **Knowledge Gathering**: Collects contextual knowledge to provide more relevant responses.
+4. **Response Generation**: Uses AI to generate appropriate responses to stakeholder requests.
+
+### Stakeholder Skills
+
+The agent supports multiple skill types:
+
+- **Basic Skills**:
+  - `Clarify`: Helps stakeholders articulate requirements clearly.
+  - `Answer`: Provides responses to stakeholder questions.
+  - `Review`: Assists with reviewing deliverables from a business perspective.
+  - `Approve`: Processes stakeholder approvals of deliverables.
+
+- **Enhanced Skills**:
+  - `ValueProposition`: Helps articulate business value for features.
+  - `Prioritization`: Assists with prioritizing features based on business value.
+  - `SprintFeedback`: Facilitates structured feedback on sprint outcomes.
+
+### Implementation Details
+
+The Stakeholder agent is implemented with the following components:
+
+1. **GithubWebHookProcessor**: Handles GitHub events and translates them into appropriate stakeholder messages.
+2. **Stakeholder.cs**: Contains the agent implementation, message handlers, and response generation logic.
+3. **Protocol Messages**: Defined in both temporary implementation (TemporaryMessages.cs) and protocol buffers (messages.proto).
+4. **State Definitions**: Defined in states.proto, including structures for business priorities, value propositions, etc.
+
+### Stakeholder Workflow
+
+A typical stakeholder interaction follows this flow:
+
+1. **Request Initiation**: A stakeholder creates a GitHub issue with an appropriate Stakeholder label.
+2. **Processing**: The Stakeholder agent processes the request and extracts relevant information.
+3. **Response**: The agent generates a structured response based on the request type.
+4. **Iteration**: The stakeholder can iterate with the agent through issue comments.
+5. **Finalization**: Once the interaction is complete (issue closed), the results are passed to the relevant SCRUM team member (typically the Product Owner).
+
+### Code Integration Points
+
+The Stakeholder agent integrates with the rest of the system through:
+
+- **GitHub Web Hook Processor**: Translates GitHub events to Stakeholder messages.
+- **Message Publishing**: Publishes messages to relevant topics for other agents to consume.
+- **Response Handling**: Generates and posts GitHub comments in response to stakeholder requests.
+
+For more detailed implementation guidance, see the [Stakeholder Agent Workflow](./docs/github-flow-getting-started.md#stakeholder-agent-workflow) section in the getting started guide.

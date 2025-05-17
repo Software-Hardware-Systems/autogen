@@ -51,4 +51,8 @@
     <Protobuf Include="..\Protos\states.proto" Link="Protos\states.proto" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Messages\" />
+  </ItemGroup>
+
 </Project>

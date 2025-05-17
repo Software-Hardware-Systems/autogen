@@ -189,6 +189,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "seed-memory", "seed-memory"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "seed-memory", "samples\dev-team\seed-memory\seed-memory.csproj", "{92397126-5612-96E7-7179-6FDF50051ADE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DevTeam.BackendTests", "samples\dev-team\DevTeam.BackendTests\DevTeam.BackendTests.csproj", "{2F2DBC82-9ADD-435E-AAF4-A91652D2793E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Test", "Test", "{A490A95B-9C07-E140-AEC8-9315445E91C2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -443,6 +447,10 @@ Global
 		{92397126-5612-96E7-7179-6FDF50051ADE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{92397126-5612-96E7-7179-6FDF50051ADE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{92397126-5612-96E7-7179-6FDF50051ADE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2F2DBC82-9ADD-435E-AAF4-A91652D2793E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2F2DBC82-9ADD-435E-AAF4-A91652D2793E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2F2DBC82-9ADD-435E-AAF4-A91652D2793E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2F2DBC82-9ADD-435E-AAF4-A91652D2793E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -523,6 +531,8 @@ Global
 		{0422AC67-9885-44C9-A9B8-BA81F47E7ABB} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{B57FA5D3-D66F-4BF1-BC75-60EA83E47ED7} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{92397126-5612-96E7-7179-6FDF50051ADE} = {B57FA5D3-D66F-4BF1-BC75-60EA83E47ED7}
+		{2F2DBC82-9ADD-435E-AAF4-A91652D2793E} = {A490A95B-9C07-E140-AEC8-9315445E91C2}
+		{A490A95B-9C07-E140-AEC8-9315445E91C2} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {93384647-528D-46C8-922C-8DB36A382F0B}

@@ -16,12 +16,3 @@ public class SkillPersona
     public const string AzureGenie = "AzureGenie";
     public const string Sandbox = "Sandbox";
 }
-
-public class StakeholderActivity
-{
-    // ToDo: Expound on these activities to embody the SCRUM stakeholder role
-    public const string Ask = "Ask";
-    public const string Answer = "Answer"; // guidance
-    public const string Review = "Review"; 
-    public const string Approve = "Approve";
-}

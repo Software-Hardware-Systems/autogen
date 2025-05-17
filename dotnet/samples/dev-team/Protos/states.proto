@@ -16,3 +16,59 @@ message DeveloperLeadState {
 message ProductManagerState {
   string capabilities = 1;
 }
+
+message StakeholderState {
+  // Business priorities and goals
+  repeated BusinessPriority business_priorities = 1;
+  // Value propositions for features
+  repeated ValueProposition value_propositions = 2;
+  // Feature prioritization details
+  repeated FeaturePriority feature_priorities = 3;
+  // History of stakeholder feedback
+  repeated StakeholderFeedback feedback_history = 4;
+  // Metrics and KPIs the stakeholder cares about
+  repeated StakeholderMetric metrics = 5;
+}
+
+message BusinessPriority {
+  string name = 1;
+  string description = 2;
+  int32 importance = 3;  // 1-10 scale, 10 being highest
+  string target_date = 4;
+  repeated string related_features = 5;
+}
+
+message ValueProposition {
+  string feature_name = 1;
+  string customer_segment = 2;
+  string value_statement = 3;
+  repeated string benefits = 4;
+  repeated string risks = 5;
+}
+
+message FeaturePriority {
+  string feature_name = 1;
+  int32 customer_impact = 2;  // 1-10 scale, 10 being highest
+  int32 development_effort = 3;  // 1-10 scale, 10 being highest
+  int32 business_value = 4;  // 1-10 scale, 10 being highest
+  int32 risk = 5;  // 1-10 scale, 10 being highest
+  repeated string dependencies = 6;
+  string optimal_sprint = 7;
+}
+
+message StakeholderFeedback {
+  string sprint_or_feature = 1;
+  string feedback_content = 2;
+  bool aligned_with_goals = 3;
+  repeated string action_items = 4;
+  string timestamp = 5;
+}
+
+message StakeholderMetric {
+  string name = 1;
+  string description = 2;
+  string current_value = 3;
+  string target_value = 4;
+  string unit = 5;
+  bool is_kpi = 6;
+}
