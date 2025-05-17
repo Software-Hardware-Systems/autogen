@@ -310,7 +310,8 @@ public class Stakeholder(
                 Response = response,
                 Understanding = "I understand your request is about " + stakeholderClarify.Context,
                 ClarificationQuestions = { clarificationQuestions },
-                MissingAspects = { "Timeline constraints", "Success metrics", "Priority relative to other features" }
+                MissingAspects = { "Timeline constraints", "Success metrics", "Priority relative to other features" },
+                ProactiveVerificationQuestion = "Would you like me to analyze potential impacts on existing workflows?"
             },
             topic: new TopicId(SkillPersona.Hubber, messageContext.Topic!.Value.Source)
         ).ConfigureAwait(false);
@@ -328,7 +329,8 @@ public class Stakeholder(
                 Response = response,
                 RequiresFollowUp = requiresFollowUp,
                 FollowUpQuestion = requiresFollowUp ? "Could you provide more details about the target users?" : string.Empty,
-                Status = "Complete"
+                Status = "Complete",
+                ProactiveVerificationQuestion = "Would you like to see how this answer might affect the project timeline?"
             },
             topic: messageContext.Topic ?? new TopicId(SkillPersona.Hubber)
         ).ConfigureAwait(false);
@@ -356,7 +358,8 @@ public class Stakeholder(
                 Response = response,
                 Approved = approved,
                 ChangesRequested = { "Improve user experience", "Add more detailed metrics" },
-                NextSteps = "Update the implementation plan based on feedback"
+                NextSteps = "Update the implementation plan based on feedback",
+                ProactiveVerificationQuestion = "Should we verify if these changes align with our original business goals?"
             },
             topic: messageContext.Topic ?? new TopicId(SkillPersona.Stakeholder)
         ).ConfigureAwait(false);
@@ -372,7 +375,9 @@ public class Stakeholder(
                 Response = response,
                 ActionTaken = $"Approved {approve.ItemApproved}",
                 NextSteps = { "Update product backlog", "Prioritize for next sprint", "Inform development team" },
-                NextInteractionSuggestion = "You might want to review the implementation plan next"
+                NextInteractionSuggestion = "You might want to review the implementation plan next",
+                ChangeRequests = { approve.ChangeRequests.ToList() },
+                IsApproved = !approve.WithChanges || (approve.ChangeRequests.Count == 0)
             },
             topic: messageContext.Topic ?? new TopicId(SkillPersona.Stakeholder)
         ).ConfigureAwait(false);

@@ -47,6 +47,10 @@ message ResponseToStakeholder {
   repeated string next_steps = 3;
   // Suggestion for the next interaction
   string next_interaction_suggestion = 4;
+  // Change requests identified during response
+  repeated string change_requests = 5;
+  // Whether the item is approved
+  bool is_approved = 6;
 }
 
 // Message published when a stakeholder approves something.
@@ -61,6 +65,8 @@ message StakeholderApprove {
   bool with_changes = 4;
   // Specific changes requested as part of the approval
   repeated string change_requests = 5;
+  // The project name this approval relates to
+  string project_name = 6;
 }
 
 // Message published when a stakeholder asks for clarification.
@@ -87,6 +93,8 @@ message StakeholderClarified {
   string understanding = 3;
   // Identified missing aspects in the request
   repeated string missing_aspects = 4;
+  // Proactive verification question to anticipate future needs
+  string proactive_verification_question = 5;
 }
 
 // Message published when a stakeholder provides an answer.
@@ -111,6 +119,8 @@ message StakeholderAnswered {
   string follow_up_question = 3;
   // Status of the answer processing
   string status = 4;
+  // Proactive verification question to anticipate future needs
+  string proactive_verification_question = 5;
 }
 
 // Message published when a stakeholder reviews something.
@@ -137,6 +147,8 @@ message StakeholderReviewed {
   repeated string changes_requested = 3;
   // Next steps after the review
   string next_steps = 4;
+  // Proactive verification question to anticipate future needs
+  string proactive_verification_question = 5;
 }
 
 // Enhanced stakeholder message types
@@ -169,6 +181,8 @@ message ValuePropositionProcessed {
   repeated string suggested_metrics = 4;
   // Next steps in the process
   string next_steps = 5;
+  // Proactive verification question to anticipate future needs
+  string proactive_verification_question = 6;
 }
 
 // Message published when a stakeholder provides feature prioritization.
@@ -209,6 +223,8 @@ message PrioritizationProcessed {
   repeated string potential_conflicts = 4;
   // Recommendation for next steps
   string recommendation = 5;
+  // Proactive verification question to anticipate future needs
+  string proactive_verification_question = 6;
 }
 
 // Message published when a stakeholder provides sprint feedback.
