@@ -4,6 +4,89 @@ package devteam;
 
 option csharp_namespace = "DevTeam";
 
+// SCRUM Ceremony and Artifact Messages
+
+// --- SCRUM Ceremony Initiation, Participation, and Summary ---
+
+// Initiates a SCRUM ceremony (e.g., Sprint Planning, Daily Scrum, Sprint Review, Sprint Retrospective)
+message ScrumCeremonyInitiated {
+  string ceremony_type = 1; // e.g., "SprintPlanning", "DailyScrum", "SprintReview", "SprintRetrospective"
+  string initiator = 2;
+  string sprint_id = 3;
+  string context = 4;
+  string timestamp = 5;
+}
+
+// Message for agent/human participation in a ceremony
+message ScrumCeremonyParticipation {
+  string ceremony_type = 1;
+  string participant = 2;
+  string role = 3; // e.g., "ScrumMaster", "Developer", "ProductOwner", "Stakeholder"
+  string message = 4;
+  string sprint_id = 5;
+  string timestamp = 6;
+}
+
+// Message for summarizing the outcome of a ceremony
+message ScrumCeremonySummary {
+  string ceremony_type = 1;
+  string sprint_id = 2;
+  string summary = 3;
+  repeated string action_items = 4;
+  string facilitator = 5;
+  string timestamp = 6;
+}
+
+// --- SCRUM Artifact Delivery/Consumption ---
+
+// Message for delivering a SCRUM artifact (e.g., Sprint Backlog, Increment, Definition of Done)
+message ScrumArtifactDelivered {
+  string artifact_type = 1; // e.g., "SprintBacklog", "Increment", "DefinitionOfDone"
+  string sprint_id = 2;
+  string delivered_by = 3;
+  string content = 4;
+  string timestamp = 5;
+}
+
+// Message for consuming/acknowledging a SCRUM artifact
+message ScrumArtifactConsumed {
+  string artifact_type = 1;
+  string sprint_id = 2;
+  string consumed_by = 3;
+  string notes = 4;
+  string timestamp = 5;
+}
+
+// --- SCRUM Human/Agent Interactive Collaboration ---
+
+// Message for requesting input or confirmation during a ceremony
+message ScrumCeremonyInputRequest {
+  string ceremony_type = 1;
+  string requested_from = 2;
+  string prompt = 3;
+  string sprint_id = 4;
+  string timestamp = 5;
+}
+
+// Message for providing input or confirmation during a ceremony
+message ScrumCeremonyInputResponse {
+  string ceremony_type = 1;
+  string responder = 2;
+  string response = 3;
+  string sprint_id = 4;
+  string timestamp = 5;
+}
+
+// Message for tracking ceremony progress or state
+message ScrumCeremonyProgress {
+  string ceremony_type = 1;
+  string sprint_id = 2;
+  string status = 3; // e.g., "NotStarted", "InProgress", "Completed"
+  repeated string participants = 4;
+  string facilitator = 5;
+  string timestamp = 6;
+}
+
 // NewAsk Message: Published when the user/client creates a new GitHub issue assigned to the DevTeam
 //  - Initiates the DevTeam workflow for processing the user's ask.
 // Message Publisher: GitHubWebHookProcessor
@@ -267,7 +350,7 @@ message SprintFeedbackProcessed {
   string next_sprint_recommendations = 5;
 }
 
-// ReadmeRequested Message: Published whenever a GitHub issue, assigned to the Program Manager, is created or commentted on.
+// ReadmeRequested Message: Published whenever a GitHub issue, assigned to the Program Manager, is created or commented on.
 //  -Indicates new information is available for the README generation process.
 // Message Publisher: GithubWebHookProcessor
 //  - In response to the GitHub application webhook for new issue or issue comment

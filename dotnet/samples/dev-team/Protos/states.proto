@@ -4,6 +4,19 @@ package devteam;
 
 option csharp_namespace = "DevTeam";
 
+// SCRUM Ceremony State Tracking
+message ScrumCeremonyState {
+  string ceremony_type = 1; // e.g., "SprintPlanning", "DailyScrum", "SprintReview", "SprintRetrospective"
+  string sprint_id = 2;
+  string status = 3; // e.g., "NotStarted", "InProgress", "Completed"
+  repeated string participants = 4;
+  string facilitator = 5;
+  string started_at = 6;
+  string ended_at = 7;
+  string summary = 8;
+  repeated string action_items = 9;
+}
+
 
 message DeveloperState {
   string understanding = 1;
