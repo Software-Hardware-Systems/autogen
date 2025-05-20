@@ -12,27 +12,20 @@ using Octokit.Webhooks.Events;
 using Octokit.Webhooks.Events.IssueComment;
 using Octokit.Webhooks.Events.Issues;
 using Octokit.Webhooks.Models;
+using static DevTeam.Backend.Agents.Stakeholder.Stakeholder;
 
 namespace DevTeam.Backend.Services;
 
-/// <summary>
-/// Extension to define stakeholder-specific label types
-/// </summary>
-public static class StakeholderSkills
+public sealed class GithubWebHookProcessor : WebhookEventProcessor
 {
-    public const string Clarify = "Clarify";
-    public const string Answer = "Answer";
-    public const string Review = "Review";  
-    public const string Approve = "Approve";
-    public const string ValueProposition = "ValueProposition";
-    public const string Prioritization = "Prioritization";
-    public const string SprintFeedback = "SprintFeedback";
-}
+    private readonly ILogger<GithubWebHookProcessor> _logger;
+    private readonly IAgentRuntime _agentRuntime;
 
-public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logger, IAgentRuntime agentRuntime) : WebhookEventProcessor
-{
-    private readonly ILogger<GithubWebHookProcessor> _logger = logger;
-    private readonly IAgentRuntime _agentRuntime = agentRuntime;
+    public GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logger, IAgentRuntime agentRuntime)
+    {
+        _logger = logger;
+        _agentRuntime = agentRuntime;
+    }
 
     protected override async Task ProcessIssuesWebhookAsync(WebhookHeaders headers, IssuesEvent issuesEvent, IssuesAction action)
     {
@@ -101,7 +94,7 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
                     await HandleNewAsk(userName, issueContent, skillType, skillActivity, topicSource);
                     break;
                 case var ia when ia == IssuesAction.Closed:
-                    await HandleAskApproval(userName, issueContent, skillType, skillActivity, topicSource);
+                    await HandleAskApproval(repo, userName, issueContent, skillType, skillActivity, topicSource);
                     break;
             }
         }
@@ -200,11 +193,20 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
         }
     }
 
-    private async Task HandleAskApproval(string? userName, string userMessage, string skillPersona, string skillActivity, string topicSource)
+    private async Task HandleAskApproval(string? projectName, string? userName, string userMessage, string skillPersona, string skillActivity, string topicSource)
     {
         try
         {
             _logger.LogInformation("Handling ask approval");
+
+            // Extract meaningful approval context from the user message
+            // Strip any prefixes that might interfere with analysis
+            string cleanUserMessage = userMessage;
+
+            // The approval context will be the cleaned user message
+            // In a future enhancement, this could fetch the latest comment on the issue
+            // instead of using the closing message if it doesn't contain sufficient context
+            string approvalContextMessage = cleanUserMessage;
 
             IMessage askApprovalMessage = (skillPersona, skillActivity) switch
             {
@@ -212,37 +214,51 @@ public sealed class GithubWebHookProcessor(ILogger<GithubWebHookProcessor> logge
                 (SkillPersona.Stakeholder, StakeholderSkills.Clarify) => new StakeholderApprove
                 {
                     UserName = userName,
-                    UserMessage = $"[CLARIFY_APPROVAL] {userMessage}"
+                    UserMessage = approvalContextMessage,
+                    ItemApproved = "Clarification",
+                    ProjectName = projectName ?? "SWHWSysDevTeam",
                 },
                 (SkillPersona.Stakeholder, StakeholderSkills.Answer) => new StakeholderApprove
                 {
                     UserName = userName,
-                    UserMessage = $"[ANSWER_APPROVAL] {userMessage}"
+                    UserMessage = approvalContextMessage,
+                    ItemApproved = "Answer",
+                    ProjectName = projectName ?? "SWHWSysDevTeam",
                 },
                 (SkillPersona.Stakeholder, StakeholderSkills.Review) => new StakeholderApprove
                 {
                     UserName = userName,
-                    UserMessage = $"[REVIEW_APPROVAL] {userMessage}"
+                    UserMessage = approvalContextMessage,
+                    ItemApproved = "Review",
+                    ProjectName = projectName ?? "SWHWSysDevTeam"
                 },
                 (SkillPersona.Stakeholder, StakeholderSkills.Approve) => new StakeholderApprove
                 {
                     UserName = userName,
-                    UserMessage = $"[APPROVE_APPROVAL] {userMessage}"
+                    UserMessage = approvalContextMessage,
+                    ItemApproved = "Approval",
+                    ProjectName = projectName ?? "SWHWSysDevTeam"
                 },
                 (SkillPersona.Stakeholder, StakeholderSkills.ValueProposition) => new StakeholderApprove
                 {
                     UserName = userName,
-                    UserMessage = $"[VALUE_PROPOSITION_APPROVAL] {userMessage}"
+                    UserMessage = approvalContextMessage,
+                    ItemApproved = "Value Proposition",
+                    ProjectName = projectName ?? "SWHWSysDevTeam"
                 },
                 (SkillPersona.Stakeholder, StakeholderSkills.Prioritization) => new StakeholderApprove
                 {
                     UserName = userName,
-                    UserMessage = $"[PRIORITIZATION_APPROVAL] {userMessage}"
+                    UserMessage = approvalContextMessage,
+                    ItemApproved = "Prioritization",
+                    ProjectName = projectName ?? "SWHWSysDevTeam"
                 },
                 (SkillPersona.Stakeholder, StakeholderSkills.SprintFeedback) => new StakeholderApprove
                 {
                     UserName = userName,
-                    UserMessage = $"[SPRINT_FEEDBACK_APPROVAL] {userMessage}"
+                    UserMessage = approvalContextMessage,
+                    ItemApproved = "Sprint Feedback",
+                    ProjectName = projectName ?? "SWHWSysDevTeam"
                 },
 
                 // Standard SCRUM team approvals
