@@ -1,5 +1,5 @@
 ---
-applyTo: "**"
+applyTo: "**/*.cs"
 ---
 
 SCRUM-ALIGNED CODE INSTRUCTIONS
