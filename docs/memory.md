@@ -31,22 +31,29 @@ The AI Board of Directors is a semi-autonomous AI agent ecosystem that mirrors t
 - Incorporates input from diversity specialist for conflict detection/resolution
 
 ### Work Management
+
 - Supports asynchronous work with extended conversation pauses
 - High customization allowed for all agent roles
+- Conversation threads serve as the basis for checkpoints and metrics
+- System designed to recover from interruptions and outages
 
 ### Integration
+
 - MCP used for all external system integrations
 - Checkpoints and metrics based on conversation threads
 
 ### Information Management
+
 - Separates "How to think" (company IP) from "What to think about" (client data)
 - Local-to-cloud context management strategy for data handling
 
 ## Success Metrics
+
 - Comparison of AI-generated artifacts with human-generated ones
 - Monitoring approaches that model human organizational monitoring
 
 ## Future Considerations
+
 - Multi-tenant infrastructure for supporting multiple users/organizations
 - Enhanced AIGent resources for improved performance and capabilities
 - Backup and conversation persistence strategies
@@ -63,3 +70,4 @@ This section documents important files in the system and their purposes:
 - `dotnet/samples/dev-team/devteam.backend/agents`: Prototype DevTeam implementations
 - `.vscode/mcp.json`: MCP configuration file
 - `docs/memory.md`: This file - documentation of system architecture and memory
+- `docs/ai_board_prd.md`: Product Requirements Document for the AI Board of Directors system
