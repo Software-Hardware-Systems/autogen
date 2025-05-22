@@ -144,7 +144,7 @@ public static class ServiceCollectionChatClientExtensions
             .AddChatClient(service =>
             {
                 var openAiClient = service.GetRequiredService<OpenAIClient>();
-                return openAiClient.AsChatClient(modelOrDeploymentName);
+                return openAiClient.GetChatClient(modelOrDeploymentName).AsIChatClient();
             });
 
         return services;
@@ -164,23 +164,10 @@ public static class ServiceCollectionChatClientExtensions
                 throw new InvalidOperationException($"No {nameof(modelOrDeploymentName)} was specified, and none could be found from configuration at '{configKey}'");
             }
         }
-
-        var endpointKey = $"{serviceName}:Endpoint";
-        var endpoint = hostBuilder.Configuration[endpointKey];
-        if (string.IsNullOrEmpty(endpoint))
-        {
-            throw new InvalidOperationException($"No endpoint was specified for the Azure Inference Chat Client at '{endpointKey}'");
-        }
-
-        var apiKeyKey = $"{serviceName}:ApiKey";
-        var apiKey = hostBuilder.Configuration[apiKeyKey];
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            throw new InvalidOperationException($"No api key was specified for the Azure Inference Chat Client at '{apiKeyKey}'");
-        }
-
-        var endpointUri = new Uri(endpoint);
-        var chatClient = new ChatCompletionsClient(endpointUri, new AzureKeyCredential(apiKey)).AsChatClient(modelOrDeploymentName);
+        var endpoint = $"{serviceName}:Endpoint" ?? throw new InvalidOperationException($"No endpoint was specified for the Azure Inference Chat Client");
+        var endpointUri = string.IsNullOrEmpty(endpoint) ? null : new Uri(endpoint);
+        var token = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY") ?? throw new InvalidOperationException("No model access token was found in the environment variable AZURE_OPENAI_API_KEY");
+        var chatClient = new ChatCompletionsClient(endpointUri, new AzureKeyCredential(token)).AsIChatClient(modelOrDeploymentName);
         hostBuilder.Services.AddChatClient(chatClient);
 
         return hostBuilder.Services;
